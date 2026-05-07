@@ -254,6 +254,64 @@ export interface RenaksiBatchRequest {
   jenisRealisasi: "NAIK" | "TURUN";
 }
 
+export interface RenaksiTriwulanCell {
+  target: number | string;
+  realisasi: number;
+  satuan: string;
+  capaian: string;
+  keteranganCapaian: string | null;
+}
+
+export interface RenaksiOpdTriwulanResponse {
+  renaksiId: string;
+  renaksi: string;
+  rekinId: string;
+  rekin: string;
+  targetId: string;
+  tw1: RenaksiTriwulanCell;
+  tw2: RenaksiTriwulanCell;
+  tw3: RenaksiTriwulanCell;
+  tw4: RenaksiTriwulanCell;
+}
+
+export interface RenaksiOpdBatchMonthlyRequest {
+  renaksiId: string;
+  renaksi: string;
+  kodeOpd: string;
+  rekinId: string;
+  rekin: string;
+  targetId: string;
+  target: string;
+  realisasi: number;
+  satuan: string;
+  bulan: string;
+  tahun: string;
+  jenisRealisasi: "NAIK" | "TURUN";
+}
+
+export interface RenaksiOpdMonthlyResponse {
+  id: number;
+  renaksiId: string;
+  renaksi: string;
+  rekinId: string;
+  rekin: string;
+  targetId: string;
+  target: string;
+  realisasi: number;
+  satuan: string;
+  bulan: string;
+  tahun: string;
+  jenisRealisasi: "NAIK" | "TURUN";
+  status?: string | null;
+  createdBy?: string | null;
+  lastModifiedBy?: string | null;
+  createdDate?: string | null;
+  lastModifiedDate?: string | null;
+  version?: number | null;
+  capaian?: string | null;
+  keteranganCapaian?: string | null;
+}
+
 export interface RekinIndividuResponse {
   id: number;
   rekinId: string;
@@ -482,6 +540,8 @@ export interface TujuanOpdTargetRealisasiCapaian {
   satuan: string;
   tahun: string;
   kodeOpd: string;
+  rumusPerhitungan: string;
+  sumberData: string;
 }
 
 export interface TujuanOpdRealisasi {
@@ -490,6 +550,9 @@ export interface TujuanOpdRealisasi {
   tujuan: string;
   indikatorId: string;
   indikator: string;
+  bulan: string;
+  rumusPerhitungan?: string | null;
+  sumberData?: string | null;
   targetId: string;
   target: string;
   realisasi: number;
@@ -507,10 +570,25 @@ export interface TujuanOpdRealisasi {
 
 export type TujuanOpdRealisasiResponse = TujuanOpdRealisasi[];
 
+export interface TujuanOpdRealisasiGroupedIndikator {
+  id: string;
+  indikator: string;
+  rumusPerhitungan: string;
+  sumberData: string;
+  targets: TujuanOpdTargetRealisasiCapaian[];
+}
+
+export interface TujuanOpdRealisasiGrouped {
+  tujuanId: string;
+  tujuanOpd: string;
+  indikator: TujuanOpdRealisasiGroupedIndikator[];
+}
+
 export interface TujuanOpdRealisasiRequest {
   targetRealisasiId: number | null;
   tujuanId: string;
   indikatorId: string;
+  indikator: string;
   targetId: string;
   target: string;
   realisasi: number | null;
@@ -519,6 +597,8 @@ export interface TujuanOpdRealisasiRequest {
   bulan: string;
   jenisRealisasi: string;
   kodeOpd: string;
+  rumusPerhitungan: string;
+  sumberData: string;
 }
 
 export interface SasaranOpdPerencanaanResponse {
@@ -549,8 +629,8 @@ export interface SasaranOpdPerencanaan {
 
 export interface SasaranOpdRealisasi {
   id: number;
-  sasaranId: string;
-  sasaran: string;
+  renjaId: string;
+  renja: string;
   indikatorId: string;
   indikator: string;
   targetId: string;
@@ -558,8 +638,11 @@ export interface SasaranOpdRealisasi {
   realisasi: number;
   satuan: string;
   tahun: string;
+  bulan: string;
   jenisRealisasi: "NAIK" | "TURUN";
   kodeOpd: string;
+  rumusPerhitungan?: string | null;
+  sumberData?: string | null;
   status: "UNCHECKED" | "CHECKED";
   createdDate: string;
   lastModifiedDate: string;
@@ -572,8 +655,8 @@ export type SasaranOpdRealisasiResponse = SasaranOpdRealisasi[];
 
 export interface SasaranOpdTargetRealisasiCapaian {
   targetRealisasiId: number | null;
-  sasaranOpd: string;
-  sasaranId: string;
+  renja: string;
+  renjaId: string;
   indikatorId: string;
   indikator: string;
   targetId: string;
@@ -584,11 +667,27 @@ export interface SasaranOpdTargetRealisasiCapaian {
   satuan: string;
   tahun: string;
   kodeOpd: string;
+  rumusPerhitungan: string;
+  sumberData: string;
+}
+
+export interface SasaranOpdRealisasiGroupedIndikator {
+  id: string;
+  indikator: string;
+  rumusPerhitungan: string;
+  sumberData: string;
+  targets: SasaranOpdTargetRealisasiCapaian[];
+}
+
+export interface SasaranOpdRealisasiGrouped {
+  renjaId: string;
+  renja: string;
+  indikator: SasaranOpdRealisasiGroupedIndikator[];
 }
 
 export interface SasaranOpdRealisasiRequest {
   targetRealisasiId: number | null;
-  sasaranId: string;
+  renjaId: string;
   indikatorId: string;
   targetId: string;
   target: string;
@@ -598,6 +697,8 @@ export interface SasaranOpdRealisasiRequest {
   bulan: string;
   jenisRealisasi: string;
   kodeOpd: string;
+  rumusPerhitungan: string;
+  sumberData: string;
 }
 
 export interface RenjaTargetIndividuResponse {
@@ -734,15 +835,14 @@ export interface RenjaPaguBatchRequest {
 }
 
 export interface RenjaTargetOpdResponse {
-  id: number;
-  renjaTargetId: string;
-  renjaTarget: string;
+  id: number | null;
+  jenisRenjaId: string;
   jenisRenjaTarget: string;
   indikatorId: string;
   indikator: string;
   targetId: string;
   target: string;
-  realisasi: number;
+  realisasi: number | null;
   satuan: string;
   tahun: string;
   bulan: string;
@@ -761,9 +861,8 @@ export interface RenjaTargetOpdResponse {
 
 export interface RenjaTargetOpdRequest {
   targetRealisasiId: number | null;
-  renjaTargetId: string;
-  renjaTarget: string;
-  jenisRenjaTarget: string;
+  jenisRenjaId: string;
+  jenisRenja: string;
   indikatorId: string;
   indikator: string;
   targetId: string;
@@ -778,12 +877,11 @@ export interface RenjaTargetOpdRequest {
 }
 
 export interface RenjaPaguOpdResponse {
-  id: number;
-  renjaPaguId: string;
-  renjaPagu: string;
+  id: number | null;
+  jenisRenjaId: string;
   jenisRenjaPagu: "PROGRAM" | "KEGIATAN" | "SUB_KEGIATAN";
   pagu: number;
-  realisasi: number;
+  realisasi: number | null;
   satuan: string;
   tahun: string;
   bulan: string;
@@ -802,13 +900,9 @@ export interface RenjaPaguOpdResponse {
 
 export interface RenjaPaguOpdBatchRequest {
   targetRealisasiId: number | null;
-  renjaPaguId: string;
-  renjaPagu: string;
-  jenisRenjaPagu: string;
-  indikatorId: string;
-  indikator: string;
+  jenisRenjaId: string;
+  jenisRenja: string;
   pagu: number;
-  targetId: string;
   realisasi: number;
   satuan: string;
   tahun: string;

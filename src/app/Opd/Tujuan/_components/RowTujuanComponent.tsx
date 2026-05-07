@@ -1,21 +1,22 @@
 import React from 'react'
 import { ButtonGreenBorder } from "@/components/Global/Button/button";
-import { TujuanOpdPerencanaan, TujuanOpdTargetRealisasiCapaian } from '@/types';
+import { TujuanOpdRealisasiGrouped } from '@/types';
+import { formatPercentageText } from '@/lib/formatPercentageText';
 
 interface RowTujuanComponentProps {
     no: number;
-    tujuan: TujuanOpdPerencanaan;
-    dataTargetRealisasi: TujuanOpdTargetRealisasiCapaian[];
+    tujuan: TujuanOpdRealisasiGrouped;
     tahun: number;
+    canEdit: boolean;
     handleOpenPrintPreview: () => void;
-    handleOpenModal: (tujuan: TujuanOpdPerencanaan, dataTargetRealisasi: TujuanOpdTargetRealisasiCapaian[]) => void;
+    handleOpenModal: (dataTargetRealisasi: TujuanOpdRealisasiGrouped["indikator"][number]["targets"]) => void;
 }
 
 const RowTujuanComponent: React.FC<RowTujuanComponentProps> = ({
     no,
     tujuan,
-    dataTargetRealisasi,
     tahun,
+    canEdit,
     handleOpenPrintPreview,
     handleOpenModal
 }) => {
@@ -25,53 +26,69 @@ const RowTujuanComponent: React.FC<RowTujuanComponentProps> = ({
         return <EmptyIndikatorRow no={no} tujuan={tujuan} tahun={tahun} handleOpenPrintPreview={handleOpenPrintPreview} />
     }
 
+    const totalRows = indikatorList.reduce((sum, ind) => {
+        const targetCount = ind.targets?.length ?? 0;
+        return sum + (targetCount > 0 ? targetCount : 1);
+    }, 0);
+
     return (
         <>
-            {indikatorList.map((ind, index) => {
-                const targetList = dataTargetRealisasi.filter(r => r.indikatorId === ind.id.toString() && r.tahun === tahun.toString());
-                const handleClick = () => {
-                    const filteredData = dataTargetRealisasi.filter(r => r.indikatorId === ind.id.toString() && r.tahun === tahun.toString());
-                    handleOpenModal(tujuan, filteredData);
+            {indikatorList.map((ind, indikatorIndex) => {
+                const sortedTargets = [...(ind.targets ?? [])].sort((a, b) => {
+                    const aId = Number(a.targetId);
+                    const bId = Number(b.targetId);
+                    if (!Number.isNaN(aId) && !Number.isNaN(bId)) return aId - bId;
+                    return String(a.targetId).localeCompare(String(b.targetId));
+                });
+
+                const targetsForRows = sortedTargets.length > 0 ? sortedTargets : [null];
+                const handleClick = (targetIndex: number) => {
+                    const selectedTarget = targetsForRows[targetIndex];
+                    if (selectedTarget) {
+                        handleOpenModal([selectedTarget]);
+                    }
                 };
-                return (
-                    <tr key={ind.id || index}>
-                        {index === 0 && (
+
+                return targetsForRows.map((target, targetIndex) => (
+                    <tr key={`${ind.id || indikatorIndex}-${target?.targetId ?? `empty-${targetIndex}`}-${tahun}`}>
+                        {indikatorIndex === 0 && targetIndex === 0 && (
                             <>
-                                <td rowSpan={indikatorList.length} className="border border-red-400 px-6 py-4 text-center">{no}</td>
-                                <td rowSpan={indikatorList.length} className="border border-red-400 px-6 py-4 text-center">{tujuan.tujuan}</td>
+                                <td rowSpan={totalRows} className="border border-red-400 px-6 py-4 text-center">{no}</td>
+                                <td rowSpan={totalRows} className="border border-red-400 px-6 py-4 text-center">{tujuan.tujuanOpd}</td>
                             </>
                         )}
-                        <td className="border border-red-400 px-6 py-4 text-center">{ind?.indikator || '-'}</td>
-                        <td className="border border-red-400 px-6 py-4 text-center">{ind?.rumus_perhitungan || '-'}</td>
-                        <td className="border border-red-400 px-6 py-4 text-center">{ind?.sumber_data || '-'}</td>
-                        {targetList.length > 0 ? (
-                            <React.Fragment key={`${ind.id || index}-target-${tahun}`}>
-                                {targetList.map((target, idx) => (
-                                    <ColTargetTujuanComponent
-                                        key={target.targetRealisasiId || idx}
-                                        target={target.target}
-                                        realisasi={target.realisasi}
-                                        satuan={target.satuan}
-                                        capaian={target.capaian}
-                                        keteranganCapaian={target.keteranganCapaian}
-                                        handleClick={handleClick}
-                                    />
-                                ))}
-                            </React.Fragment>
-                        ) : (
-                            <React.Fragment key={`${ind.id || index}-target-${tahun}`}>
-                                <td className="border border-red-400 px-6 py-4 text-center" colSpan={4}>
-                                    Tidak ada target
-                                </td>
-                            </React.Fragment>
+
+                        {targetIndex === 0 && (
+                            <>
+                                <td rowSpan={targetsForRows.length} className="border border-red-400 px-6 py-4 text-center">{ind?.indikator || '-'}</td>
+                                <td rowSpan={targetsForRows.length} className="border border-red-400 px-6 py-4 text-center">{ind?.rumusPerhitungan || '-'}</td>
+                                <td rowSpan={targetsForRows.length} className="border border-red-400 px-6 py-4 text-center">{ind?.sumberData || '-'}</td>
+                            </>
                         )}
+
+                        {target ? (
+                            <ColTargetTujuanComponent
+                                target={target.target}
+                                realisasi={target.realisasi}
+                                satuan={target.satuan}
+                                capaian={target.capaian}
+                                keteranganCapaian={target.keteranganCapaian}
+                                canEdit={canEdit}
+                                handleClick={canEdit ? () => handleClick(targetIndex) : undefined}
+                            />
+                        ) : (
+                            <td className="border border-red-400 px-6 py-4 text-center" colSpan={5}>
+                                Tidak ada target
+                            </td>
+                        )}
+
                         <td className="border border-red-400 px-6 py-4 text-center">
                             <ButtonGreenBorder className="w-full" onClick={handleOpenPrintPreview}>
                                 Cetak
                             </ButtonGreenBorder>
                         </td>
                     </tr>
-                )
+                ));
             })}
         </>
     );
@@ -80,7 +97,7 @@ const RowTujuanComponent: React.FC<RowTujuanComponentProps> = ({
 export default RowTujuanComponent;
 
 const EmptyIndikatorRow: React.FC<{
-    tujuan: any;
+    tujuan: TujuanOpdRealisasiGrouped;
     no: number;
     tahun: number;
     handleOpenPrintPreview: () => void;
@@ -91,9 +108,9 @@ const EmptyIndikatorRow: React.FC<{
     handleOpenPrintPreview,
 }) => {
         return (
-            <tr key={tujuan.id}>
+            <tr key={tujuan.tujuanId}>
                 <td className="border border-red-400 px-6 py-4 text-center">{no}</td>
-                <td className="border border-red-400 px-6 py-4 text-center">{tujuan.tujuan}</td>
+                <td className="border border-red-400 px-6 py-4 text-center">{tujuan.tujuanOpd}</td>
                 <td colSpan={8} className="border border-red-400 px-6 py-4 text-center text-gray-500 italic bg-red-300">
                     Tidak ada indikator dan target tahun {tahun}
                 </td>
@@ -113,10 +130,11 @@ type TargetColProps = {
     satuan: string;
     capaian: string;
     keteranganCapaian: string;
+    canEdit: boolean;
     handleClick?: () => void;
 };
 
-const ColTargetTujuanComponent: React.FC<TargetColProps> = ({ target, realisasi, satuan, capaian, keteranganCapaian, handleClick }) => {
+const ColTargetTujuanComponent: React.FC<TargetColProps> = ({ target, realisasi, satuan, capaian, keteranganCapaian, canEdit, handleClick }) => {
 
     return (
         <>
@@ -124,7 +142,7 @@ const ColTargetTujuanComponent: React.FC<TargetColProps> = ({ target, realisasi,
             <td className="border border-red-400 px-6 py-4 text-center">
                 <div className="flex flex-col items-center gap-2">
                     <span>{realisasi}</span>
-                    {handleClick && (
+                    {canEdit && handleClick && (
                         <ButtonGreenBorder
                             className="w-full"
                             onClick={handleClick}
@@ -135,8 +153,8 @@ const ColTargetTujuanComponent: React.FC<TargetColProps> = ({ target, realisasi,
                 </div>
             </td>
             <td className="border border-red-400 px-6 py-4 text-center">{satuan}</td>
-            <td className="border border-red-400 px-6 py-4 text-center">{capaian}</td>
-            <td className="border border-red-400 px-6 py-4">{keteranganCapaian || '-'}</td>
+            <td className="border border-red-400 px-6 py-4 text-center">{formatPercentageText(capaian)}</td>
+            <td className="border border-red-400 px-6 py-4">{formatPercentageText(keteranganCapaian || '-')}</td>
         </>
     );
 }

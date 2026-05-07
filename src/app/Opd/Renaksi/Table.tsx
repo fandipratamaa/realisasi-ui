@@ -4,23 +4,48 @@ import React, { useEffect, useState } from 'react'
 import { LoadingBeat } from '@/components/Global/Loading'
 import { useFilterContext } from '@/context/FilterContext'
 import { useFetchData } from '@/hooks/useFetchData'
-import { getMonthName } from '@/lib/months'
+import { getMonthKey, getMonthName } from '@/lib/months'
+import { formatPercentageText } from '@/lib/formatPercentageText'
 import { ButtonGreenBorder } from "@/components/Global/Button/button";
-import { RenaksiIndividuResponse, RenaksiTarget } from '@/types'
+import { RenaksiOpdMonthlyResponse, RenaksiOpdTriwulanResponse, RenaksiTriwulanCell } from '@/types'
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 interface RenaksiRow {
-  id: number
+  id: string | number
+  renaksiId: string
   renaksi: string
-  nama_pegawai: string
-  nip: string
+  rekinId: string
   rekin: string
-  targets: RenaksiTarget[]
+  targetId: string
+  target: number | string
+  realisasi: number
+  satuan: string
+  capaian: string
+  keteranganCapaian: string | null
 }
+
+const EMPTY_TRIWULAN_CELL: RenaksiTriwulanCell = {
+  target: '-',
+  realisasi: 0,
+  satuan: '-',
+  capaian: '-',
+  keteranganCapaian: '-',
+}
+
+const normalizeTriwulanCell = (
+  cell: Partial<RenaksiTriwulanCell> | null | undefined,
+): RenaksiTriwulanCell => ({
+  target: cell?.target ?? '-',
+  realisasi: cell?.realisasi ?? 0,
+  satuan: cell?.satuan ?? '-',
+  capaian: cell?.capaian ?? '-',
+  keteranganCapaian: cell?.keteranganCapaian ?? '-',
+})
 
 const Table = () => {
   const [rows, setRows] = useState<RenaksiRow[]>([])
+  const [triwulanRows, setTriwulanRows] = useState<RenaksiOpdTriwulanResponse[]>([])
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfFileName, setPdfFileName] = useState<string>("renaksi-OPD.pdf");
@@ -28,14 +53,25 @@ const Table = () => {
 
   const { activatedDinas: kodeOpd, activatedTahun, activatedBulan, namaDinas } = useFilterContext()
 
+  const monthKey = getMonthKey(activatedBulan)
   const monthLabel = getMonthName(activatedBulan)
+
   const apiUrl =
-    kodeOpd && activatedTahun && monthLabel
-      ? `/api/v1/realisasi/renaksi/by-kodeOpd/${encodeURIComponent(kodeOpd)}/by-tahun/${encodeURIComponent(activatedTahun)}/by-bulan/${encodeURIComponent(monthLabel)}`
+    kodeOpd && activatedTahun && monthKey
+      ? `/api/v1/realisasi/renaksi_opd/by-kode-opd/${encodeURIComponent(kodeOpd)}/by-tahun/${encodeURIComponent(activatedTahun)}/by-bulan/${encodeURIComponent(monthKey)}`
       : null
 
-  const { data, loading, error } = useFetchData<RenaksiIndividuResponse[]>({
+  const triwulanApiUrl =
+    kodeOpd && activatedTahun
+      ? `/api/v1/realisasi/renaksi_opd/by-kode-opd/${encodeURIComponent(kodeOpd)}/by-tahun/${encodeURIComponent(activatedTahun)}/rekap-triwulan`
+      : null
+
+  const { data, loading, error } = useFetchData<RenaksiOpdMonthlyResponse[]>({
     url: apiUrl,
+  })
+
+  const { data: triwulanData } = useFetchData<RenaksiOpdTriwulanResponse[]>({
+    url: triwulanApiUrl,
   })
 
   useEffect(() => {
@@ -44,60 +80,35 @@ const Table = () => {
       return
     }
 
-    const groupedByNip = new Map<string, RenaksiIndividuResponse[]>()
-
-    data.forEach((item) => {
-      const nipKey = item.nip || 'unknown'
-      const existing = groupedByNip.get(nipKey) || []
-      groupedByNip.set(nipKey, [...existing, item])
-    })
-
-    const newRows: RenaksiRow[] = []
-
-    groupedByNip.forEach((items, nipKey) => {
-      const firstItem = items[0]
-      const namaPegawai = firstItem.nip || '-'
-
-      const targets: RenaksiTarget[] = items.map((item) => ({
-        targetRealisasiId: item.id ?? null,
+    setRows(
+      data.map((item) => ({
+        id: item.id ?? `${item.renaksiId}-${item.targetId}`,
         renaksiId: item.renaksiId,
         renaksi: item.renaksi ?? '-',
-        nip: item.nip ?? '-',
         rekinId: item.rekinId,
         rekin: item.rekin ?? '-',
         targetId: item.targetId,
-        target: item.target,
-        realisasi: item.realisasi,
-        satuan: item.satuan,
-        tahun: item.tahun,
-        bulan: item.bulan,
-        jenisRealisasi: item.jenisRealisasi,
+        target: item.target ?? '-',
+        realisasi: item.realisasi ?? 0,
+        satuan: item.satuan ?? '-',
         capaian: item.capaian ?? '-',
         keteranganCapaian: item.keteranganCapaian ?? '-',
-        rencanaKinerja: item.rekin,
       }))
-
-      newRows.push({
-        id: firstItem.id,
-        renaksi: firstItem.renaksi ?? '-',
-        nama_pegawai: namaPegawai,
-        nip: nipKey,
-        rekin: firstItem.rekin ?? '-',
-        targets,
-      })
-    })
-
-    setRows(newRows)
+    )
   }, [data])
+
+  useEffect(() => {
+    setTriwulanRows(triwulanData ?? [])
+  }, [triwulanData])
 
   const createPdfDocument = () => {
     const doc = new jsPDF({
       orientation: "landscape",
       unit: "pt",
-      format: "a4",
+      format: "a3",
     });
 
-    const periodLabel = `${monthColumnLabel}`;
+    const periodLabel = `${activatedTahun || '-'}`;
     const opdTitle = namaDinas ? ` - ${namaDinas}` : "";
 
     doc.setFontSize(14);
@@ -107,43 +118,48 @@ const Table = () => {
 
     const tableHead = [[
       "No",
-      "Rencana Kinerja",
-      "Nama Pemilik",
       "Rencana Aksi",
-      "Target",
-      "Realisasi",
-      "Satuan",
-      "Capaian",
-      "Keterangan Capaian",
+      "Rencana Kinerja",
+      "TW1 Target",
+      "TW1 Realisasi",
+      "TW1 Satuan",
+      "TW1 Capaian",
+      "TW1 Ket. Capaian",
+      "TW2 Target",
+      "TW2 Realisasi",
+      "TW2 Satuan",
+      "TW2 Capaian",
+      "TW2 Ket. Capaian",
+      "TW3 Target",
+      "TW3 Realisasi",
+      "TW3 Satuan",
+      "TW3 Capaian",
+      "TW3 Ket. Capaian",
+      "TW4 Target",
+      "TW4 Realisasi",
+      "TW4 Satuan",
+      "TW4 Capaian",
+      "TW4 Ket. Capaian",
     ]];
 
     const tableBody: any[] = [];
 
-    rows.forEach((item, index) => {
-      const targets = item.targets.length ? item.targets : [null];
+    triwulanRows.forEach((item, index) => {
+      const tws = [item.tw1, item.tw2, item.tw3, item.tw4].map((tw) => normalizeTriwulanCell(tw ?? EMPTY_TRIWULAN_CELL));
+      const detailRow = tws.flatMap((tw) => [
+        tw?.target ?? "-",
+        tw?.realisasi ?? "-",
+        tw?.satuan ?? "-",
+        formatPercentageText(tw?.capaian ?? "-"),
+        formatPercentageText(tw?.keteranganCapaian ?? "-"),
+      ]);
 
-      targets.forEach((target, targetIndex) => {
-        const detailRow = [
-          target?.target || "-",
-          target?.realisasi ?? "-",
-          target?.satuan || "-",
-          target?.capaian || "-",
-          target?.keteranganCapaian || "-",
-        ];
-
-        if (targetIndex === 0) {
-          tableBody.push([
-            { content: index + 1, rowSpan: targets.length },
-            { content: item.rekin || "-", rowSpan: targets.length },
-            { content: `${item.nama_pegawai || "-"} (${item.nip || "-"})`, rowSpan: targets.length },
-            { content: item.renaksi || "-", rowSpan: targets.length },
-            ...detailRow,
-          ]);
-          return;
-        }
-
-        tableBody.push(detailRow);
-      });
+      tableBody.push([
+        index + 1,
+        item.renaksi || "-",
+        item.rekin || "-",
+        ...detailRow,
+      ]);
     });
 
     autoTable(doc, {
@@ -171,9 +187,8 @@ const Table = () => {
       theme: "grid",
     });
 
-    const safeMonthLabel = String(activatedBulan || "bulan").replace(/\s+/g, "-").toLowerCase();
     const safeYearLabel = String(activatedTahun || "tahun").replace(/\s+/g, "-").toLowerCase();
-    const fileName = `renaksi-individu-${safeYearLabel}-${safeMonthLabel}.pdf`;
+    const fileName = `renaksi-opd-${safeYearLabel}-triwulan.pdf`;
     return { doc, fileName };
   };
 
@@ -206,23 +221,7 @@ const Table = () => {
     previewDoc.save(pdfFileName);
   };
 
-  const monthColumnLabel = activatedTahun && monthLabel
-    ? `${activatedTahun} - ${monthLabel}`
-    : 'Bulan'
-
-  const infoMessage = !kodeOpd
-    ? 'Silakan pilih OPD terlebih dahulu untuk melihat data renaksi OPD.'
-    : !monthLabel
-      ? 'Pilih dan aktifkan bulan agar data renaksi OPD muncul.'
-      : undefined
-
-  if (infoMessage) {
-    return (
-      <div className="p-5 bg-red-100 border-red-400 rounded text-red-700 my-5">
-        {infoMessage}
-      </div>
-    )
-  }
+  const yearMonthColumnLabel = `${activatedTahun || 'Tahun'} - ${monthLabel || 'Bulan'}`
 
   if (loading) {
     return (
@@ -234,9 +233,25 @@ const Table = () => {
   }
 
   if (error) {
+    const normalizedError = String(error).toLowerCase()
+    const isOpdNotFoundError =
+      normalizedError.includes('404') ||
+      normalizedError.includes('not found') ||
+      normalizedError.includes('tidak ditemukan')
+
     return (
       <div className="rounded border border-red-300 px-4 py-6 text-center text-sm text-red-700">
-        Gagal memuat data renaksi: {error}
+        {isOpdNotFoundError
+          ? 'Data OPD yang anda pilih tidak ada'
+          : `Gagal memuat data renaksi: ${error}`}
+      </div>
+    )
+  }
+
+  if (!monthKey) {
+    return (
+      <div className="rounded border border-emerald-200 px-4 py-6 text-center text-sm text-gray-600">
+        Pilih dan aktifkan bulan agar data renaksi OPD muncul.
       </div>
     )
   }
@@ -244,7 +259,7 @@ const Table = () => {
   if (!rows.length) {
     return (
       <div className="rounded border border-emerald-200 px-4 py-6 text-center text-sm text-gray-600">
-        Data renaksi untuk {monthLabel} belum tersedia.
+        Data renaksi OPD tidak ada.
       </div>
     )
   }
@@ -260,14 +275,11 @@ const Table = () => {
             <td rowSpan={2} className="border-r border-b px-6 py-3 min-w-[400px] text-center">
               Rencana Aksi
             </td>
-            <td rowSpan={2} className="border-r border-b px-6 py-3 min-w-[200px]">
-              Nama Pemilik
-            </td>
             <td rowSpan={2} className="border-r border-b px-6 py-3 min-w-[180px]">
               Rencana Kinerja
             </td>
-            <th colSpan={5} className="border-l border-b px-6 py-3 min-w-[100px]">
-              {monthColumnLabel}
+            <th colSpan={4} className="border-l border-b px-6 py-3 min-w-[100px] text-center uppercase">
+              {yearMonthColumnLabel}
             </th>
             <td
               rowSpan={2}
@@ -277,16 +289,14 @@ const Table = () => {
             </td>
           </tr>
           <tr className="bg-emerald-500 text-white">
-            <th className="border-l border-b px-6 py-3 min-w-[50px]">Target</th>
-            <th className="border-l border-b px-6 py-3 min-w-[50px]">Realisasi</th>
-            <th className="border-l border-b px-6 py-3 min-w-[50px]">Satuan</th>
-            <th className="border-l border-b px-6 py-3 min-w-[50px]">Capaian</th>
-            <th className="border-l border-b px-6 py-3 min-w-[150px]">Keterangan Capaian</th>
+            <th className="border-l border-b px-3 py-2 min-w-[70px]">Target</th>
+            <th className="border-l border-b px-3 py-2 min-w-[90px]">Realisasi (%)</th>
+            <th className="border-l border-b px-3 py-2 min-w-[80px]">Capaian</th>
+            <th className="border-l border-b px-3 py-2 min-w-[180px]">Keterangan Capaian</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row, index) => {
-            const target = row.targets[0]
             return (
               <tr key={row.id}>
                 <td className="border-x border-b border-emerald-500 py-4 px-3 text-center">
@@ -296,25 +306,21 @@ const Table = () => {
                   {row.renaksi || '-'}
                 </td>
                 <td className="border-r border-b border-emerald-500 px-6 py-4">
-                  {row.nama_pegawai || '-'} ({row.nip || '-'})
-                </td>
-                <td className="border-r border-b border-emerald-500 px-6 py-4">
                   {row.rekin || '-'}
                 </td>
-                <td className="border-r border-b border-emerald-500 px-6 py-4">
-                  {target?.target || '-'}
+                <td className="border-r border-b border-emerald-500 px-3 py-4 text-center align-middle">
+                  {row.target ?? '-'}
                 </td>
-                <td className="border-r border-b border-emerald-500 px-6 py-4">
-                  {target?.realisasi ?? '-'}
+                <td className="border-r border-b border-emerald-500 px-3 py-4 text-center align-middle">
+                  <div className="flex flex-col items-center leading-tight">
+                    <span>{row.realisasi ?? '-'}</span>
+                  </div>
                 </td>
-                <td className="border-r border-b border-emerald-500 px-6 py-4">
-                  {target?.satuan || '-'}
+                <td className="border-r border-b border-emerald-500 px-3 py-4 text-center align-middle">
+                  {formatPercentageText(row.capaian ?? '-')}
                 </td>
-                <td className="border-r border-b border-emerald-500 px-6 py-4">
-                  {target?.capaian || '-'}
-                </td>
-                <td className="border-r border-b border-emerald-500 px-6 py-4">
-                  {target?.keteranganCapaian || '-'}
+                <td className="border-r border-b border-emerald-500 px-3 py-4 text-center align-middle">
+                  {formatPercentageText(row.keteranganCapaian ?? '-')}
                 </td>
                 <td className="border-r border-b border-emerald-500 px-6 py-4">
                   <div className="flex flex-col items-center gap-2">

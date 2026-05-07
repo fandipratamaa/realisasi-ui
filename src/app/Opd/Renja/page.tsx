@@ -7,10 +7,18 @@ import Table from './Table'
 const RenjaTargetPage = () => {
   const { activatedDinas: kodeOpd, activatedTahun: selectedTahun, activatedBulan: selectedBulan } = useFilterContext()
 
-  if (!kodeOpd || !selectedTahun || !selectedBulan) {
+  if (!kodeOpd) {
     return (
       <div className="p-5 bg-red-100 border-red-400 rounded text-red-700 my-5">
-        Harap pilih OPD, periode dan tahun, serta bulan dahulu
+        Silakan pilih OPD terlebih dahulu untuk melihat data renja OPD.
+      </div>
+    )
+  }
+
+  if (!selectedTahun || !selectedBulan) {
+    return (
+      <div className="p-5 bg-red-100 border-red-400 rounded text-red-700 my-5">
+        Pilih dan aktifkan tahun dan bulan agar data renja OPD muncul.
       </div>
     )
   }

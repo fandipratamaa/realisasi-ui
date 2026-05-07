@@ -7,6 +7,7 @@ import { RenjaPaguOpdBatchRequest, RenjaPaguOpdResponse } from "@/types";
 import { useApiUrlContext } from "@/context/ApiUrlContext";
 import { useFilterContext } from "@/context/FilterContext";
 import { useSubmitData } from "@/hooks/useSubmitData";
+import { getMonthKey, getMonthName } from "@/lib/months";
 
 interface FormRealisasiProps {
     requestValues: any[];
@@ -23,6 +24,8 @@ const FormRealisasiRenjaPaguOpd: React.FC<FormRealisasiProps> = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
     const { activatedDinas: kodeOpd, activatedTahun, activatedBulan } = useFilterContext();
+    const monthKey = getMonthKey(activatedBulan);
+    const monthLabel = getMonthName(activatedBulan) ?? "-";
     const { url } = useApiUrlContext();
     const submitUrl = useMemo(
         () => (url ? `${url}/api/v1/realisasi/renja_pagu/batch` : "/api/v1/realisasi/renja_pagu/batch"),
@@ -59,19 +62,20 @@ const FormRealisasiRenjaPaguOpd: React.FC<FormRealisasiProps> = ({
             return;
         }
 
-const payload: RenjaPaguOpdBatchRequest[] = formData.map((item) => ({
+        if (!monthKey) {
+            setValidationError("Bulan tidak valid. Silakan pilih bulan aktif terlebih dahulu.");
+            return;
+        }
+
+        const payload: RenjaPaguOpdBatchRequest[] = formData.map((item) => ({
             targetRealisasiId: item.targetRealisasiId ?? 0,
-            renjaPaguId: item.renjaPaguId ?? "",
-            renjaPagu: item.renja ?? "",
-            jenisRenjaPagu: item.jenisRenja ?? "",
-            indikatorId: item.indikatorId ?? "",
-            indikator: item.indikator ?? "",
+            jenisRenjaId: item.renjaId ?? "",
+            jenisRenja: item.jenisRenja ?? "",
             pagu: item.pagu ?? 0,
-            targetId: item.targetId ?? "",
             realisasi: item.realistasiPagu ?? 0,
             satuan: item.satuanPagu ?? "",
             tahun: item.tahun,
-            bulan: getMonthName(activatedBulan),
+            bulan: monthKey,
             jenisRealisasi: (item.jenisRealisasi || "NAIK") as "NAIK" | "TURUN",
             kodeOpd: kodeOpd ?? "",
             kodeRenja: item.kodeRenja ?? "",
@@ -102,13 +106,6 @@ const payload: RenjaPaguOpdBatchRequest[] = formData.map((item) => ({
     const currentRenja = formData[0]?.renja ?? "-";
     const currentIndikator = formData[0]?.indikator ?? "-";
 
-    const getMonthName = (month: string | number | null): string => {
-        if (!month) return "-";
-        const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-        const monthNum = typeof month === "string" ? parseInt(month) : month;
-        return monthNames[monthNum] || "-";
-    };
-
     return (
         <form
             onSubmit={handleSubmit}
@@ -124,7 +121,7 @@ const payload: RenjaPaguOpdBatchRequest[] = formData.map((item) => ({
                             className="border p-2 rounded bg-gray-50 shadow-sm flex flex-col col-span-2"
                         >
                             <div className="text-center text-xs font-semibold bg-red-500 text-white rounded py-0.5 mb-1">
-                                {activatedTahun} - {getMonthName(activatedBulan)}
+                                {activatedTahun} - {monthLabel}
                             </div>
                             <p className="uppercase text-xs font-bold text-gray-700 mb-2">Pagu</p>
                             <p className="w-full bg-gray-300 border rounded px-2 py-1 text-sm mb-1">

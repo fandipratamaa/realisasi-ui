@@ -4,10 +4,14 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React from 'react'
 import { RouteGuard } from '@/components/Global/RouteGuard'
+import { useUserContext } from '@/context/UserContext'
+import { canEditOpdRealisasi } from '@/lib/rbac'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const { user } = useUserContext()
   const pathname = usePathname()
   const relativePath = pathname.replace(/^\/realisasi/, '')
+  const canEdit = canEditOpdRealisasi(user)
   const navItems = [
     {
       label: 'Tujuan',
@@ -26,14 +30,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       href: '/Opd/Renja',
       activeClass: 'bg-sky-600 text-white border-sky-600',
       inactiveClass: 'text-[#1C1D1D] hover:bg-sky-800 hover:text-white',
+      requiresEdit: true,
     },
     {
       label: 'Renaksi',
       href: '/Opd/Renaksi',
       activeClass: 'bg-green-600 text-white border-green-600',
       inactiveClass: 'text-[#1C1D1D] hover:bg-green-700 hover:text-white',
+      requiresEdit: true,
     },
-  ]
+  ].filter((item) => !item.requiresEdit || canEdit)
 
   return (
     <RouteGuard>

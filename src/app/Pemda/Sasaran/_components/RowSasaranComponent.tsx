@@ -1,6 +1,7 @@
 import React from "react";
 import { ButtonGreenBorder } from "@/components/Global/Button/button";
 import { SasaranPemda, TargetRealisasiCapaianSasaran } from "@/types";
+import { formatPercentageText } from "@/lib/formatPercentageText";
 
 interface RowSasaranComponentProps {
   no: number;
@@ -151,8 +152,8 @@ const ColTargetSasaran: React.FC<{
         </div>
       </td>
       <td className="border border-red-400 px-6 py-4 text-center">{satuan}</td>
-      <td className="border border-red-400 px-6 py-4 text-center">{capaian}</td>
-      <td className="border border-red-400 px-6 py-4">{keteranganCapaian || "-"}</td>
+      <td className="border border-red-400 px-6 py-4 text-center">{formatPercentageText(capaian)}</td>
+      <td className="border border-red-400 px-6 py-4">{formatPercentageText(keteranganCapaian || "-")}</td>
     </>
   );
 };

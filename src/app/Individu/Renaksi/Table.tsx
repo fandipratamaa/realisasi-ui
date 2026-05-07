@@ -10,7 +10,8 @@ import autoTable from "jspdf-autotable";
 import { useFilterContext } from "@/context/FilterContext";
 import { useUserContext } from "@/context/UserContext";
 import { useFetchData } from "@/hooks/useFetchData";
-import { getMonthName } from "@/lib/months";
+import { getMonthKey, getMonthName } from "@/lib/months";
+import { formatPercentageText } from "@/lib/formatPercentageText";
 import { RenaksiIndividuResponse, RenaksiTarget } from "@/types";
 import { getHeaderColor } from "@/lib/userLevelStyle";
 import { ROLES } from "@/constants/roles";
@@ -35,6 +36,7 @@ const Table = () => {
 
   const { activatedTahun, activatedBulan, namaDinas } = useFilterContext();
   const { user } = useUserContext();
+  const canBypassNip = user?.roles.includes(ROLES.SUPER_ADMIN) || user?.roles.includes(ROLES.ADMIN_OPD);
 
   const userLevel = user?.roles.find(r => r.startsWith('level_'));
 
@@ -62,12 +64,13 @@ const getHeaderColor = (level: string | undefined) => {
   const headerFillColor = getHeaderFillColor(userLevel);
 
   const yearLabel = activatedTahun;
+  const monthKey = getMonthKey(activatedBulan);
   const monthLabel = getMonthName(activatedBulan);
   const apiUrl =
-    activatedTahun && monthLabel && user?.nip
+    activatedTahun && monthKey && user?.nip
       ? `/api/v1/realisasi/renaksi/by-nip/${encodeURIComponent(
         user.nip,
-      )}/by-tahun/${encodeURIComponent(activatedTahun)}/by-bulan/${encodeURIComponent(monthLabel)}`
+      )}/by-tahun/${encodeURIComponent(activatedTahun)}/by-bulan/${encodeURIComponent(monthKey)}`
       : null;
 
   const { data, loading, error } = useFetchData<RenaksiIndividuResponse[]>({
@@ -176,8 +179,8 @@ const getHeaderColor = (level: string | undefined) => {
           target?.target || "-",
           target?.realisasi ?? "-",
           target?.satuan || "-",
-          target?.capaian || "-",
-          target?.keteranganCapaian || "-",
+          formatPercentageText(target?.capaian || "-"),
+          formatPercentageText(target?.keteranganCapaian || "-"),
         ];
 
         if (targetIndex === 0) {
@@ -254,13 +257,11 @@ const getHeaderColor = (level: string | undefined) => {
     previewDoc.save(pdfFileName);
   };
 
-  const infoMessage = !user?.nip
+  const infoMessage = !user || (!user?.nip && !canBypassNip)
     ? "Silakan login terlebih dahulu untuk melihat data renaksi individu."
-    : !activatedTahun
-      ? "Harap pilih tahun dahulu"
-      : !monthLabel
-        ? "Harap pilih bulan dahulu"
-        : undefined;
+    : !activatedTahun || !monthLabel
+      ? "Pilih dan aktifkan tahun dan bulan agar data renaksi individu muncul."
+      : undefined;
 
   if (infoMessage) {
     return (
@@ -291,8 +292,8 @@ const getHeaderColor = (level: string | undefined) => {
 
   if (!rows.length) {
     return (
-      <div className="rounded border border-emerald-200 px-4 py-6 text-center text-sm text-gray-600">
-        Data renaksi untuk {monthLabel} belum tersedia.
+      <div className="rounded border border-red-200 px-4 py-6 text-center text-sm text-gray-600">
+        Data renaksi individu tidak ada.
       </div>
     );
   }
@@ -385,10 +386,10 @@ const getHeaderColor = (level: string | undefined) => {
                     {target?.satuan || "-"}
                   </td>
                   <td className="border-r border-b border-emerald-500 px-6 py-4">
-                    {target?.capaian || "-"}
+                    {formatPercentageText(target?.capaian || "-")}
                   </td>
                   <td className="border-r border-b border-emerald-500 px-6 py-4">
-                    {target?.keteranganCapaian || "-"}
+                    {formatPercentageText(target?.keteranganCapaian || "-")}
                   </td>
                   <td className="border-r border-b border-emerald-500 px-6 py-4">
                     <div className="flex flex-col items-center gap-2">

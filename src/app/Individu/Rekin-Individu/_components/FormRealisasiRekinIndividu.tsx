@@ -7,7 +7,7 @@ import { FormProps, RekinTarget, RekinBatchRequest, RekinIndividuResponse } from
 import { useApiUrlContext } from "@/context/ApiUrlContext";
 import { useFilterContext } from "@/context/FilterContext";
 import { useSubmitData } from "@/hooks/useSubmitData";
-import { getMonthName } from "@/lib/months";
+import { getMonthKey, getMonthName } from "@/lib/months";
 
 type FormRealisasiRekinIndividuProps = FormProps<RekinTarget[], RekinTarget[]>;
 
@@ -16,6 +16,7 @@ const FormRealisasiRekinIndividu: React.FC<FormRealisasiRekinIndividuProps> = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
     const { tahun: selectedTahun, activatedBulan } = useFilterContext();
+    const monthKey = getMonthKey(activatedBulan);
     const monthLabel = getMonthName(activatedBulan);
     const activePeriodLabel = selectedTahun && monthLabel ? `${selectedTahun} - ${monthLabel}` : (selectedTahun ?? "Tahun");
     const { url } = useApiUrlContext();
@@ -36,10 +37,10 @@ const FormRealisasiRekinIndividu: React.FC<FormRealisasiRekinIndividuProps> = ({
             requestValues.map((item) => ({
                 ...item,
                 tahun: selectedTahun ?? item.tahun,
-                bulan: monthLabel ?? item.bulan,
+                bulan: monthKey ?? item.bulan,
             }))
         );
-    }, [requestValues, selectedTahun]);
+    }, [requestValues, selectedTahun, monthKey]);
 
     const handleChange = (targetId: string, tahun: string, value: string) => {
         const parsedValue = parseFloat(value);
@@ -86,6 +87,11 @@ const FormRealisasiRekinIndividu: React.FC<FormRealisasiRekinIndividuProps> = ({
             return;
         }
 
+        if (!monthKey) {
+            setValidationError("Bulan belum dipilih atau belum aktif.");
+            return;
+        }
+
 const payload: RekinBatchRequest[] = formData.map((item) => ({
             targetRealisasiId: item.targetRealisasiId,
             rekinId: item.rekinId,
@@ -98,7 +104,7 @@ const payload: RekinBatchRequest[] = formData.map((item) => ({
             realisasi: item.realisasi,
             satuan: item.satuan,
             tahun: item.tahun ?? baseTahun,
-            bulan: item.bulan ?? monthLabel ?? "",
+            bulan: getMonthKey(item.bulan) ?? monthKey,
             jenisRealisasi: item.jenisRealisasi,
             idSasaran: item.idSasaran,
             sasaran: item.sasaran,

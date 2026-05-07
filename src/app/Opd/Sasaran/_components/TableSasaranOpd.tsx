@@ -1,25 +1,25 @@
 import React from 'react'
 import RowSasaranComponent from './RowSasaranComponent';
-import { SasaranOpdPerencanaan, SasaranOpdTargetRealisasiCapaian } from '@/types'
+import { SasaranOpdRealisasiGrouped } from '@/types'
 
 
 interface TableSasaranOpdProps {
     tahun: number;
     bulanLabel?: string;
-    sasaranOpd: SasaranOpdPerencanaan[];
-    targetRealisasiCapaians: SasaranOpdTargetRealisasiCapaian[];
+    sasaranOpd: SasaranOpdRealisasiGrouped[];
+    canEdit: boolean;
     handleOpenPrintPreview: () => void;
-    handleOpenModal: (sasaran: SasaranOpdPerencanaan, dataTargetRealisasi: SasaranOpdTargetRealisasiCapaian[], indikatorId: string) => void;
+    handleOpenModal: (dataTargetRealisasi: SasaranOpdRealisasiGrouped["indikator"][number]["targets"]) => void;
 }
 
-export default function TableSasaranOpd({ tahun, bulanLabel, sasaranOpd, targetRealisasiCapaians, handleOpenPrintPreview, handleOpenModal }: TableSasaranOpdProps) {
+export default function TableSasaranOpd({ tahun, bulanLabel, sasaranOpd, canEdit, handleOpenPrintPreview, handleOpenModal }: TableSasaranOpdProps) {
 
     return (
         <table className="w-full">
             <thead>
                 <tr className="text-xm bg-emerald-500 text-white">
                     <td rowSpan={2} className="border-r border-b px-6 py-3 max-w-[100px] text-center">No</td>
-                    <td rowSpan={2} className="border-r border-b px-6 py-3 min-w-[400px] text-center">Sasaran OPD</td>
+                    <td rowSpan={2} className="border-r border-b px-6 py-3 min-w-[400px] text-center">Rencana Kerja</td>
                     <td rowSpan={2} className="border-r border-b px-6 py-3 min-w-[400px]">Indikator</td>
                     <td rowSpan={2} className="border-r border-b px-6 py-3 min-w-[300px]">Rumus Perhitungan</td>
                     <td rowSpan={2} className="border-r border-b px-6 py-3 min-w-[300px]">Sumber Data</td>
@@ -37,11 +37,11 @@ export default function TableSasaranOpd({ tahun, bulanLabel, sasaranOpd, targetR
             <tbody>
                 {sasaranOpd.map((sasOpd, index) => (
                     <RowSasaranComponent
-                        key={sasOpd.id}
+                        key={sasOpd.renjaId}
                         no={index + 1}
                         sasaranOpd={sasOpd}
-                        dataTargetRealisasi={targetRealisasiCapaians}
                         tahun={tahun}
+                        canEdit={canEdit}
                         handleOpenPrintPreview={handleOpenPrintPreview}
                         handleOpenModal={handleOpenModal}
                     />

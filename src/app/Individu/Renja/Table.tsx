@@ -8,7 +8,8 @@ import { useFilterContext } from "@/context/FilterContext";
 import { useUserContext } from "@/context/UserContext";
 import { useFetchData } from "@/hooks/useFetchData";
 import { useApiUrlContext } from "@/context/ApiUrlContext";
-import { getMonthName } from "@/lib/months";
+import { getMonthKey, getMonthName } from "@/lib/months";
+import { formatPercentageText } from "@/lib/formatPercentageText";
 import { RenjaTargetIndividuResponse, RenjaTarget, RenjaPaguIndividuResponse } from "@/types";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -41,6 +42,7 @@ const Table = () => {
     const { tahun: selectedTahun, activatedTahun, activatedBulan, namaDinas } = useFilterContext();
     const { user } = useUserContext();
     const { url } = useApiUrlContext();
+    const canBypassNip = user?.roles.includes(ROLES.SUPER_ADMIN) || user?.roles.includes(ROLES.ADMIN_OPD);
 
     const userLevel = user?.roles.find(r => r.startsWith('level_'));
 
@@ -66,14 +68,15 @@ const getHeaderColor = (level: string | undefined) => {
     const headerColor = getHeaderColor(userLevel);
     const headerFillColor = getHeaderFillColor(userLevel);
 
+    const bulanKey = getMonthKey(activatedBulan);
     const bulanName = getMonthName(activatedBulan);
 
-    const apiUrlTarget = url && user?.nip && activatedTahun && bulanName
-        ? `${url}/api/v1/realisasi/renja_target_individu/by-nip/${encodeURIComponent(user.nip)}/by-tahun/${encodeURIComponent(activatedTahun)}/by-bulan/${encodeURIComponent(bulanName)}`
+    const apiUrlTarget = url && user?.nip && activatedTahun && bulanKey
+        ? `${url}/api/v1/realisasi/renja_target_individu/by-nip/${encodeURIComponent(user.nip)}/by-tahun/${encodeURIComponent(activatedTahun)}/by-bulan/${encodeURIComponent(bulanKey)}`
         : null;
 
-    const apiUrlPagu = url && user?.nip && activatedTahun && bulanName
-        ? `${url}/api/v1/realisasi/renja_pagu_individu/by-nip/${encodeURIComponent(user.nip)}/by-tahun/${encodeURIComponent(activatedTahun)}/by-bulan/${encodeURIComponent(bulanName)}`
+    const apiUrlPagu = url && user?.nip && activatedTahun && bulanKey
+        ? `${url}/api/v1/realisasi/renja_pagu_individu/by-nip/${encodeURIComponent(user.nip)}/by-tahun/${encodeURIComponent(activatedTahun)}/by-bulan/${encodeURIComponent(bulanKey)}`
         : null;
 
     const { data, loading, error } = useFetchData<RenjaTargetIndividuResponse[]>({
@@ -85,7 +88,7 @@ const getHeaderColor = (level: string | undefined) => {
     });
 
     useEffect(() => {
-        if (!activatedTahun || !bulanName) {
+        if (!activatedTahun || !bulanKey) {
             setRows([]);
             return;
         }
@@ -138,7 +141,7 @@ const getHeaderColor = (level: string | undefined) => {
                 };
             })
         );
-    }, [data, paguResponse, user, activatedTahun, bulanName]);
+    }, [data, paguResponse, user, activatedTahun, bulanKey]);
 
     const openModal = (row: RenjaRow, type: 'target' | 'pagu' = 'target') => {
         setSelectedRow(row);
@@ -212,13 +215,13 @@ const getHeaderColor = (level: string | undefined) => {
                     target?.target || "-",
                     target?.realisasi ?? "-",
                     target?.satuan || "-",
-                    target?.capaian || "-",
-                    target?.keteranganCapaian || "-",
+                    formatPercentageText(target?.capaian || "-"),
+                    formatPercentageText(target?.keteranganCapaian || "-"),
                     target?.pagu != null ? target.pagu.toLocaleString() : "-",
                     target?.realisasiPagu != null ? target.realisasiPagu.toLocaleString() : "-",
                     target?.satuanPagu || "-",
-                    target?.capaianPagu || "-",
-                    target?.keteranganCapaianPagu || "-",
+                    formatPercentageText(target?.capaianPagu || "-"),
+                    formatPercentageText(target?.keteranganCapaianPagu || "-"),
                 ];
 
                 if (targetIndex === 0) {
@@ -316,10 +319,10 @@ const getHeaderColor = (level: string | undefined) => {
         previewDoc.save(pdfFileName);
     };
 
-    const infoMessage = !user?.nip
+    const infoMessage = !user || (!user?.nip && !canBypassNip)
         ? "Silakan login terlebih dahulu untuk melihat data renja individu."
         : !activatedTahun || !bulanName
-            ? "Harap pilih tahun dan bulan dahulu"
+            ? "Pilih dan aktifkan tahun dan bulan agar data renja individu muncul."
             : undefined;
 
     if (infoMessage) {
@@ -351,8 +354,8 @@ const getHeaderColor = (level: string | undefined) => {
 
     if (!rows.length) {
         return (
-            <div className="rounded border border-emerald-200 px-4 py-6 text-center text-sm text-gray-600">
-                Data renja untuk tahun {activatedTahun} belum tersedia.
+            <div className="rounded border border-red-200 px-4 py-6 text-center text-sm text-gray-600">
+                Data renja individu tidak ada.
             </div>
         );
     }
@@ -426,10 +429,10 @@ const getHeaderColor = (level: string | undefined) => {
                                         {target?.satuan || "-"}
                                     </td>
                                     <td className="border-r border-b border-emerald-500 px-6 py-4">
-                                        {target?.capaian || "-"}
+                                        {formatPercentageText(target?.capaian || "-")}
                                     </td>
                                     <td className="border-r border-b border-emerald-500 px-6 py-4">
-                                        {target?.keteranganCapaian || "-"}
+                                        {formatPercentageText(target?.keteranganCapaian || "-")}
                                     </td>
                                     <td className="border-r border-b border-emerald-500 px-6 py-4">
                                         {target?.pagu != null ? target.pagu.toLocaleString() : "-"}
@@ -449,10 +452,10 @@ const getHeaderColor = (level: string | undefined) => {
                                         {target?.satuanPagu || "-"}
                                     </td>
                                     <td className="border-r border-b border-emerald-500 px-6 py-4">
-                                        {target?.capaianPagu || "-"}
+                                        {formatPercentageText(target?.capaianPagu || "-")}
                                     </td>
                                     <td className="border-x border-b border-emerald-500 px-6 py-4">
-                                        {target?.keteranganCapaianPagu || "-"}
+                                        {formatPercentageText(target?.keteranganCapaianPagu || "-")}
                                     </td>
                                     <td className="border-r border-b border-emerald-500 px-6 py-4">
                                         <div className="flex flex-col items-center gap-2">

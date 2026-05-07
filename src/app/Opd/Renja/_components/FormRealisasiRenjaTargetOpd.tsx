@@ -6,6 +6,7 @@ import { LoadingButtonClip } from "@/components/Global/Loading";
 import { FormProps, RenjaTargetOpdResponse, RenjaTargetOpdRequest } from "@/types";
 import { useApiUrlContext } from "@/context/ApiUrlContext";
 import { useSubmitData } from "@/hooks/useSubmitData";
+import { getMonthKey, getMonthName } from "@/lib/months";
 
 const FormRealisasiRenjaTargetOpd: React.FC<FormProps<RenjaTargetOpdResponse, RenjaTargetOpdResponse[]>> = ({
     requestValues,
@@ -22,9 +23,8 @@ const FormRealisasiRenjaTargetOpd: React.FC<FormProps<RenjaTargetOpdResponse, Re
         if (requestValues) {
             setFormData({
                 targetRealisasiId: requestValues.id,
-                renjaTargetId: requestValues.renjaTargetId,
-                renjaTarget: requestValues.renjaTarget,
-                jenisRenjaTarget: requestValues.jenisRenjaTarget,
+                jenisRenjaId: requestValues.jenisRenjaId,
+                jenisRenja: requestValues.jenisRenjaTarget,
                 indikatorId: requestValues.indikatorId,
                 indikator: requestValues.indikator,
                 targetId: requestValues.targetId,
@@ -32,7 +32,7 @@ const FormRealisasiRenjaTargetOpd: React.FC<FormProps<RenjaTargetOpdResponse, Re
                 realisasi: requestValues.realisasi,
                 satuan: requestValues.satuan,
                 tahun: requestValues.tahun,
-                bulan: requestValues.bulan,
+                bulan: getMonthKey(requestValues.bulan) ?? "",
                 jenisRealisasi: requestValues.jenisRealisasi,
                 kodeOpd: requestValues.kodeOpd,
                 kodeRenja: requestValues.kodeRenja
@@ -62,8 +62,18 @@ const FormRealisasiRenjaTargetOpd: React.FC<FormProps<RenjaTargetOpdResponse, Re
             return;
         }
 
+        if (!getMonthKey(formData.bulan)) {
+            setValidationError("Bulan tidak valid. Silakan pilih bulan aktif terlebih dahulu.");
+            return;
+        }
+
+        const payload: RenjaTargetOpdRequest = {
+            ...formData,
+            targetRealisasiId: formData.targetRealisasiId ?? 0,
+        };
+
         setIsSubmitting(true);
-        const result = await submit([formData]);
+        const result = await submit([payload]);
         setIsSubmitting(false);
 
         if (result) {
@@ -77,8 +87,9 @@ const FormRealisasiRenjaTargetOpd: React.FC<FormProps<RenjaTargetOpdResponse, Re
 
     if (!formData) return null;
 
-    const currentRenja = formData.renjaTarget ?? "-";
+    const currentRenja = formData.jenisRenja ?? "-";
     const currentIndikator = formData.indikator ?? "-";
+    const monthLabel = getMonthName(formData.bulan) ?? formData.bulan ?? "-";
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
@@ -88,7 +99,7 @@ const FormRealisasiRenjaTargetOpd: React.FC<FormProps<RenjaTargetOpdResponse, Re
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 text-sm">
                     <div className="border p-2 rounded bg-gray-50 shadow-sm flex flex-col col-span-2">
                         <div className="text-center text-xs font-semibold bg-red-500 text-white rounded py-0.5 mb-1">
-                            {formData.tahun} - {formData.bulan}
+                            {formData.tahun} - {monthLabel}
                         </div>
                         <p className="uppercase text-xs font-bold text-gray-700 mb-2">Target</p>
                         <p className="w-full bg-gray-300 border rounded px-2 py-1 text-sm mb-1">

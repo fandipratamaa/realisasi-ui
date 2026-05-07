@@ -17,11 +17,16 @@ import TableTujuan from "./_components/TableTujuan";
 import { gabunganDataPerencanaanRealisasi } from "./_lib/gabunganDataPerencanaanRealisasi";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatPercentageText } from "@/lib/formatPercentageText";
 
 export default function Tujuan() {
-    const { periode: selectedPeriode, tahun: selectedTahun, activatedBulan, bulan } = useFilterContext();
+    const {
+        periode: selectedPeriode,
+        activatedTahun: selectedTahun,
+        activatedBulan,
+    } = useFilterContext();
     const selectedTahunValue = selectedTahun ? parseInt(selectedTahun) : 2025;
-    const bulanName = getMonthName(activatedBulan) ?? getMonthName(bulan ?? null) ?? "Bulan";
+    const bulanName = getMonthName(activatedBulan ?? null);
     const periode = useMemo<number[]>(() => {
         if (!selectedPeriode) return [];
 
@@ -116,10 +121,10 @@ export default function Tujuan() {
         };
     }, [pdfPreviewUrl]);
 
-    if (selectedTahun === null || !bulanName || periode.length === 0)
+    if (selectedTahun === null || activatedBulan === null || !bulanName || periode.length === 0)
         return (
             <div className="p-5 bg-red-100 border-red-400 rounded text-red-700 my-5">
-                Harap pilih periode, tahun, dan bulan dahulu
+                Pilih dan aktifkan periode, tahun, dan bulan agar data tujuan pemda muncul.
             </div>
         );
     /* if (!perencanaanData || !realisasiData) return <LoadingBeat loading={perencanaanLoading} />; */
@@ -129,6 +134,13 @@ export default function Tujuan() {
         return <div>Error fetching perencanaan: {perencanaanError}</div>;
     if (realisasiError)
         return <div>Error fetching realisasi: {realisasiError}</div>;
+
+    if (tujuansPemda.length === 0)
+        return (
+            <div className="rounded border border-red-200 px-4 py-6 text-center text-sm text-gray-600">
+                Data tujuan pemda tidak ada.
+            </div>
+        );
 
     const handleOpenModal = (
         tujuan: TujuanPemda,
@@ -236,8 +248,8 @@ export default function Tujuan() {
                     sanitizeForPdf(targetData?.target),
                     sanitizeForPdf(targetData?.realisasi ?? 0),
                     sanitizeForPdf(targetData?.satuan),
-                    sanitizeForPdf(targetData?.capaian),
-                    sanitizeForPdf(targetData?.keteranganCapaian),
+                    sanitizeForPdf(formatPercentageText(targetData?.capaian)),
+                    sanitizeForPdf(formatPercentageText(targetData?.keteranganCapaian)),
                 ]);
             });
         });
@@ -280,7 +292,7 @@ export default function Tujuan() {
             theme: "grid",
         });
 
-        const safeMonthLabel = String(bulanName || "bulan").replace(/\s+/g, "-").toLowerCase();
+        const safeMonthLabel = String(bulanName ?? "bulan").replace(/\s+/g, "-").toLowerCase();
         const safeYearLabel = String(selectedTahunValue || "tahun").replace(/\s+/g, "-").toLowerCase();
         const fileName = `tujuan-pemda-${safeYearLabel}-${safeMonthLabel}.pdf`;
         return { doc, fileName };

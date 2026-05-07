@@ -10,13 +10,44 @@ export function canAccessOpd(user: User | null): boolean {
   if (!user) return false;
   return (
     user.roles.includes(ROLES.SUPER_ADMIN) ||
-    user.roles.includes(ROLES.ADMIN_OPD)
+    user.roles.includes(ROLES.ADMIN_OPD) ||
+    user.roles.includes(ROLES.LEVEL_1) ||
+    user.roles.includes(ROLES.LEVEL_2) ||
+    user.roles.includes(ROLES.LEVEL_3) ||
+    user.roles.includes(ROLES.LEVEL_4)
   );
 }
 
 export function canAccessIndividu(user: User | null): boolean {
   if (!user) return false;
-  return user.roles.some((role) => INDIVIDU_ROLES.includes(role as any));
+  return (
+    user.roles.includes(ROLES.SUPER_ADMIN) ||
+    user.roles.includes(ROLES.ADMIN_OPD) ||
+    user.roles.some((role) => INDIVIDU_ROLES.includes(role as any))
+  );
+}
+
+export function canAccessIndividuRenja(user: User | null): boolean {
+  if (!user) return false;
+  if (user.roles.includes(ROLES.SUPER_ADMIN) || user.roles.includes(ROLES.ADMIN_OPD)) {
+    return true;
+  }
+  if (
+    user.roles.includes(ROLES.LEVEL_1) ||
+    user.roles.includes(ROLES.LEVEL_2) ||
+    user.roles.includes(ROLES.LEVEL_4)
+  ) {
+    return false;
+  }
+  return canAccessIndividu(user);
+}
+
+export function canEditOpdRealisasi(user: User | null): boolean {
+  if (!user) return false;
+  return (
+    user.roles.includes(ROLES.SUPER_ADMIN) ||
+    user.roles.includes(ROLES.ADMIN_OPD)
+  );
 }
 
 export function getDefaultPage(user: User | null): string {
@@ -30,7 +61,11 @@ export function getDefaultPage(user: User | null): string {
 export function canAccessRoute(pathname: string, user: User | null): boolean {
   if (!user) return false;
   if (pathname.startsWith('/Pemda')) return canAccessPemda(user);
+  if (pathname.startsWith('/Opd/Renja') || pathname.startsWith('/Opd/Renaksi')) {
+    return canEditOpdRealisasi(user);
+  }
   if (pathname.startsWith('/Opd')) return canAccessOpd(user);
+  if (pathname.startsWith('/Individu/Renja')) return canAccessIndividuRenja(user);
   if (pathname.startsWith('/Individu')) return canAccessIndividu(user);
   return true;
 }

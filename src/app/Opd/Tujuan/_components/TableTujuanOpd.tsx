@@ -1,24 +1,21 @@
 import React from "react";
 import RowTujuanComponent from "./RowTujuanComponent";
-import { TujuanOpdPerencanaan, TujuanOpdTargetRealisasiCapaian } from "@/types";
+import { TujuanOpdRealisasiGrouped } from "@/types";
 
 interface TableTujuanProps {
   tahun: number;
   bulanLabel?: string;
-  tujuanOpd: TujuanOpdPerencanaan[];
-  targetRealisasiCapaians: TujuanOpdTargetRealisasiCapaian[];
+  tujuanOpd: TujuanOpdRealisasiGrouped[];
+  canEdit: boolean;
   handleOpenPrintPreview: () => void;
-  handleOpenModal: (
-    tujuan: TujuanOpdPerencanaan,
-    dataTargetRealisasi: TujuanOpdTargetRealisasiCapaian[],
-  ) => void;
+  handleOpenModal: (dataTargetRealisasi: TujuanOpdRealisasiGrouped["indikator"][number]["targets"]) => void;
 }
 
 function TableTujuan({
   tahun,
   bulanLabel,
   tujuanOpd,
-  targetRealisasiCapaians,
+  canEdit,
   handleOpenPrintPreview,
   handleOpenModal,
 }: TableTujuanProps) {
@@ -91,11 +88,11 @@ function TableTujuan({
         {Array.isArray(tujuanOpd) && tujuanOpd.length > 0 ? (
           tujuanOpd.map((tuj, index) => (
             <RowTujuanComponent
-              key={tuj.id_tujuan_opd}
+              key={tuj.tujuanId}
               no={index + 1}
               tujuan={tuj}
-              dataTargetRealisasi={targetRealisasiCapaians}
               tahun={tahun}
+              canEdit={canEdit}
               handleOpenPrintPreview={handleOpenPrintPreview}
               handleOpenModal={handleOpenModal}
             />

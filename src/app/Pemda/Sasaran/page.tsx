@@ -17,11 +17,12 @@ import { FormModal } from "@/components/Global/Modal";
 import FormRealisasiSasaranPemda from "./_components/FormRealisasiSasaranPemda";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatPercentageText } from "@/lib/formatPercentageText";
 
 const SasaranPage = () => {
-  const { activatedTahun: selectedTahun, tahun: selectedTahunValue, activatedBulan, bulan } = useFilterContext();
-  const selectedTahunNum = selectedTahunValue ? parseInt(selectedTahunValue) : 2025;
-  const bulanName = getMonthName(activatedBulan) ?? getMonthName(bulan ?? null) ?? "Bulan";
+  const { activatedTahun: selectedTahun, activatedBulan } = useFilterContext();
+  const selectedTahunNum = selectedTahun ? parseInt(selectedTahun) : 2025;
+  const bulanName = getMonthName(activatedBulan ?? null);
   const periode = [2025, 2026, 2027, 2028, 2029, 2030];
   const tahunAwal = periode[0];
   const tahunAkhir = periode[periode.length - 1];
@@ -39,7 +40,7 @@ const SasaranPage = () => {
     error: realisasiError,
     refetch: refetchRealisasi,
   } = useFetchData<RealisasiSasaranResponse>({
-    url: selectedTahun && bulanName ? `/api/v1/realisasi/sasarans/by-tahun/${selectedTahunValue}/by-bulan/${encodeURIComponent(bulanName)}` : null,
+    url: selectedTahun && bulanName ? `/api/v1/realisasi/sasarans/by-tahun/${selectedTahun}/by-bulan/${encodeURIComponent(bulanName)}` : null,
   });
   const [TargetRealisasiCapaian, setTargetRealisasiCapaian] = useState<
     TargetRealisasiCapaianSasaran[]
@@ -87,10 +88,10 @@ const SasaranPage = () => {
   if (realisasiError)
     return <div>Error fetching realisasi: {realisasiError}</div>;
 
-  if (!selectedTahun || !bulanName) {
+  if (!selectedTahun || !activatedBulan || !bulanName) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-gray-500 text-lg">Silakan pilih tahun dan bulan, lalu klik Aktifkan</p>
+      <div className="p-5 bg-red-100 border-red-400 rounded text-red-700 my-5">
+        Pilih dan aktifkan periode, tahun, dan bulan agar data sasaran pemda muncul.
       </div>
     );
   }
@@ -199,8 +200,8 @@ const SasaranPage = () => {
           sanitizeForPdf(targetData?.target),
           sanitizeForPdf(targetData?.realisasi ?? 0),
           sanitizeForPdf(targetData?.satuan),
-          sanitizeForPdf(targetData?.capaian),
-          sanitizeForPdf(targetData?.keteranganCapaian),
+          sanitizeForPdf(formatPercentageText(targetData?.capaian)),
+          sanitizeForPdf(formatPercentageText(targetData?.keteranganCapaian)),
         ]);
       });
     });

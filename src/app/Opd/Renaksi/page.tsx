@@ -7,10 +7,18 @@ import Table from './Table'
 export default function RenaksiOpdPage() {
   const { activatedDinas: kodeOpd, activatedTahun: selectedTahun, activatedBulan: selectedBulan } = useFilterContext()
 
-  if (!kodeOpd || !selectedTahun || !selectedBulan) {
+  if (!kodeOpd) {
     return (
       <div className="p-5 bg-red-100 border-red-400 rounded text-red-700 my-5">
-        Harap pilih OPD, periode dan tahun, serta bulan dahulu
+        Silakan pilih OPD terlebih dahulu untuk melihat data renaksi OPD.
+      </div>
+    )
+  }
+
+  if (!selectedTahun) {
+    return (
+      <div className="p-5 bg-red-100 border-red-400 rounded text-red-700 my-5">
+        Pilih dan aktifkan tahun agar data renaksi OPD muncul.
       </div>
     )
   }

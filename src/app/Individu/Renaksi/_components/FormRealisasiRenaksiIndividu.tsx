@@ -26,7 +26,7 @@ const FormRealisasiRenaksiIndividu: React.FC<FormRealisasiRenaksiIndividuProps> 
     const activeMonthLabel = activeMonthKey
         ? getMonthName(activatedBulan) ?? `Bulan ${activeMonthKey}`
         : "Belum diaktifkan";
-    const selectedMonthName = getMonthName(activatedBulan ?? selectedBulan);
+    const selectedMonthKey = getMonthKey(activatedBulan ?? selectedBulan);
 
     useEffect(() => {
         if (!requestValues?.length) {
@@ -38,10 +38,10 @@ const FormRealisasiRenaksiIndividu: React.FC<FormRealisasiRenaksiIndividuProps> 
             requestValues.map((item) => ({
                 ...item,
                 tahun: selectedTahun ?? item.tahun,
-                bulan: selectedMonthName ?? item.bulan ?? null,
+                bulan: selectedMonthKey ?? getMonthKey(item.bulan) ?? null,
             }))
         );
-    }, [requestValues, selectedTahun, selectedBulan, activatedBulan]);
+    }, [requestValues, selectedTahun, selectedBulan, activatedBulan, selectedMonthKey]);
 
     const handleChange = (targetId: string, tahun: string, value: string) => {
         const parsedValue = parseFloat(value);
@@ -66,13 +66,13 @@ const FormRealisasiRenaksiIndividu: React.FC<FormRealisasiRenaksiIndividuProps> 
         const [first] = formData;
         const baseRenaksiId = first.renaksiId;
         const baseNip = first.nip;
-        const baseBulan = first.bulan;
+        const baseBulan = getMonthKey(first.bulan);
         const baseRekinId = first.rekinId;
 
         const isBatchValid = formData.every((item) =>
             item.renaksiId === baseRenaksiId &&
             item.nip === baseNip &&
-            item.bulan === baseBulan &&
+            getMonthKey(item.bulan) === baseBulan &&
             item.rekinId === baseRekinId
         );
 
@@ -99,7 +99,7 @@ const FormRealisasiRenaksiIndividu: React.FC<FormRealisasiRenaksiIndividuProps> 
             target: item.target,
             realisasi: item.realisasi,
             satuan: item.satuan,
-            bulan: item.bulan ?? baseBulan,
+            bulan: getMonthKey(item.bulan) ?? baseBulan,
             tahun: item.tahun,
             jenisRealisasi: item.jenisRealisasi,
         }));

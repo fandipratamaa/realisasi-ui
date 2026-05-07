@@ -2,6 +2,7 @@
 
 import { LoadingBeat } from "@/components/Global/Loading";
 import { useFetchData } from "@/hooks/useFetchData";
+import { useFilterContext } from "@/context/FilterContext";
 import React, { useEffect, useState } from "react";
 import { gabunganDataPerencanaanRealisasi } from "./_lib/gabunganDataSasaranRealisasi";
 import TableIku from "./_components/TableIku";
@@ -13,26 +14,46 @@ import {
 } from "@/types";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatPercentageText } from "@/lib/formatPercentageText";
 
 const IkuPage = () => {
-  const periode = [2025, 2026, 2027, 2028, 2029, 2030];
+  const {
+    periode: selectedPeriode,
+    activatedTahun: selectedTahun,
+    activatedBulan,
+  } = useFilterContext();
+  const periode: number[] = [];
+  if (selectedPeriode) {
+    const [awalStr, akhirStr] = selectedPeriode.split("-").map((t) => t.trim());
+    const awal = parseInt(awalStr);
+    const akhir = parseInt(akhirStr);
+
+    for (let y = awal; y <= akhir; y++) {
+      periode.push(y);
+    }
+  }
+
   const tahunAwal = periode[0];
   const tahunAkhir = periode[periode.length - 1];
   const jenisPeriode = "rpjmd";
-  const selectedTahun = 2025;
+  const selectedTahunValue = selectedTahun ? parseInt(selectedTahun) : 2025;
+  const canFetchPerencanaan =
+    typeof tahunAwal === "number" && typeof tahunAkhir === "number";
   const {
     data: ikuPerencanaan,
     loading: perencanaanLoading,
     error: perencanaanError,
   } = useFetchData<IkuPemdaPerencanaanResponse>({
-    url: `/api/perencanaan/indikator_utama/periode/${tahunAwal}/${tahunAkhir}/${jenisPeriode}`,
+    url: canFetchPerencanaan
+      ? `/api/perencanaan/indikator_utama/periode/${tahunAwal}/${tahunAkhir}/${jenisPeriode}`
+      : null,
   });
   const {
     data: ikuRealisasi,
     loading: realisasiLoading,
     error: realisasiError,
   } = useFetchData<IkuPemdaRealisasiResponse>({
-    url: `/api/realisasi/ikus/by-tahun/${selectedTahun}`,
+    url: selectedTahun ? `/api/realisasi/ikus/by-tahun/${selectedTahunValue}` : null,
   });
   const [PerencanaanIku, setPerencanaanIku] = useState<IkuPemda[]>([]);
   const [TargetRealisasiCapaian, setTargetRealisasiCapaian] = useState<
@@ -63,6 +84,14 @@ const IkuPage = () => {
       }
     };
   }, [pdfPreviewUrl]);
+
+  if (!selectedPeriode || !selectedTahun || !activatedBulan || periode.length === 0) {
+    return (
+      <div className="p-5 bg-red-100 border-red-400 rounded text-red-700 my-5">
+        Pilih dan aktifkan periode, tahun, dan bulan agar data IKU pemda muncul.
+      </div>
+    );
+  }
 
   if (perencanaanLoading || realisasiLoading)
     return <LoadingBeat loading={perencanaanLoading} />;
@@ -102,7 +131,7 @@ const IkuPage = () => {
     doc.setFontSize(14);
     doc.text("IKU Pemda", 40, 40);
     doc.setFontSize(10);
-    doc.text(`Periode: ${selectedTahun}`, 40, 58);
+    doc.text(`Periode: ${selectedTahunValue}`, 40, 58);
 
     const tableHead = [[
       "No",
@@ -119,8 +148,8 @@ const IkuPage = () => {
     const tableBody: any[] = [];
 
     PerencanaanIku.forEach((iku, index) => {
-      const targets = TargetRealisasiCapaian.filter(
-        (item) => item.indikatorId === iku.indikator_id && item.tahun === String(selectedTahun),
+        const targets = TargetRealisasiCapaian.filter(
+        (item) => item.indikatorId === iku.indikator_id && item.tahun === String(selectedTahunValue),
       );
 
       if (targets.length === 0) {
@@ -148,7 +177,7 @@ const IkuPage = () => {
           sanitizeForPdf(target.target),
           sanitizeForPdf(target.realisasi ?? 0),
           sanitizeForPdf(target.satuan),
-          sanitizeForPdf(target.capaian),
+          sanitizeForPdf(formatPercentageText(target.capaian)),
         ]);
       });
     });
@@ -189,7 +218,7 @@ const IkuPage = () => {
       theme: "grid",
     });
 
-    const safeYearLabel = String(selectedTahun || "tahun").replace(/\s+/g, "-").toLowerCase();
+    const safeYearLabel = String(selectedTahunValue || "tahun").replace(/\s+/g, "-").toLowerCase();
     const fileName = `iku-pemda-${safeYearLabel}.pdf`;
     return { doc, fileName };
   };
@@ -228,7 +257,7 @@ const IkuPage = () => {
       <h2 className="text-lg font-semibold mb-2">Realisasi IKU Pemda</h2>
       <div className="mt-2 rounded-t-lg border border-red-400">
         <TableIku
-          tahun={selectedTahun}
+          tahun={selectedTahunValue}
           ikuPemda={PerencanaanIku}
           targetRealisasiCapaian={TargetRealisasiCapaian}
           handleOpenPrintPreview={handleOpenPrintPreview}

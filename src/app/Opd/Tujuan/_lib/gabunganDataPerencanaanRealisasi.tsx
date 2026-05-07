@@ -47,6 +47,8 @@ export function gabunganDataPerencanaanRealisasi(
           satuan: target.satuan,
           tahun: target.tahun,
           kodeOpd: kodeOpd,
+          rumusPerhitungan: indikator.rumus_perhitungan ?? "-",
+          sumberData: indikator.sumber_data ?? "-",
         });
       });
     });

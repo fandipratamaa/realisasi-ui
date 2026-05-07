@@ -7,7 +7,7 @@ import { FormProps, RenjaTarget, RenjaBatchRequest, RenjaTargetIndividuResponse 
 import { useApiUrlContext } from "@/context/ApiUrlContext";
 import { useFilterContext } from "@/context/FilterContext";
 import { useSubmitData } from "@/hooks/useSubmitData";
-import { getMonthName } from "@/lib/months";
+import { getMonthKey, getMonthName } from "@/lib/months";
 
 type FormRealisasiRenjaTargetProps = FormProps<RenjaTarget[], RenjaTarget[]>;
 
@@ -16,6 +16,7 @@ const FormRealisasiRenjaTarget: React.FC<FormRealisasiRenjaTargetProps> = ({ req
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
     const { tahun: selectedTahun, activatedBulan } = useFilterContext();
+    const monthKey = getMonthKey(activatedBulan);
     const monthLabel = getMonthName(activatedBulan);
     const activePeriodLabel = selectedTahun && monthLabel ? `${selectedTahun} - ${monthLabel}` : (selectedTahun ?? "Tahun");
     const { url } = useApiUrlContext();
@@ -35,10 +36,10 @@ const FormRealisasiRenjaTarget: React.FC<FormRealisasiRenjaTargetProps> = ({ req
             requestValues.map((item) => ({
                 ...item,
                 tahun: selectedTahun ?? item.tahun,
-                bulan: monthLabel ?? item.bulan,
+                bulan: monthKey ?? item.bulan,
             }))
         );
-    }, [requestValues, selectedTahun, monthLabel]);
+    }, [requestValues, selectedTahun, monthKey]);
 
     const handleChange = (targetId: string, tahun: string, value: string) => {
         const parsedValue = parseFloat(value);
@@ -60,6 +61,11 @@ const FormRealisasiRenjaTarget: React.FC<FormRealisasiRenjaTargetProps> = ({ req
             return;
         }
 
+        if (!monthKey) {
+            setValidationError("Bulan belum dipilih atau belum aktif.");
+            return;
+        }
+
         const payload: RenjaBatchRequest[] = formData.map((item) => ({
             targetRealisasiId: item.targetRealisasiId,
             renjaId: item.renjaId,
@@ -74,7 +80,7 @@ const FormRealisasiRenjaTarget: React.FC<FormRealisasiRenjaTargetProps> = ({ req
             realisasi: item.realisasi,
             satuan: item.satuan,
             tahun: item.tahun,
-            bulan: item.bulan ?? monthLabel ?? "",
+            bulan: getMonthKey(item.bulan) ?? monthKey,
             jenisRealisasi: item.jenisRealisasi,
         }));
 

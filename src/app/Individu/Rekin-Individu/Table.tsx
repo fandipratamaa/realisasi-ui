@@ -10,7 +10,8 @@ import autoTable from "jspdf-autotable";
 import { useFilterContext } from "@/context/FilterContext";
 import { useUserContext } from "@/context/UserContext";
 import { useFetchData } from "@/hooks/useFetchData";
-import { getMonthName } from "@/lib/months";
+import { getMonthKey, getMonthName } from "@/lib/months";
+import { formatPercentageText } from "@/lib/formatPercentageText";
 import { RekinIndividuResponse, RekinTarget } from "@/types";
 import { getHeaderColor } from "@/lib/userLevelStyle";
 import { ROLES } from "@/constants/roles";
@@ -28,6 +29,7 @@ interface TableRow {
 const Table = () => {
     const { user } = useUserContext();
     const { tahun: selectedTahun, activatedTahun, activatedBulan, namaDinas } = useFilterContext();
+    const canBypassNip = user?.roles.includes(ROLES.SUPER_ADMIN) || user?.roles.includes(ROLES.ADMIN_OPD);
     const [rows, setRows] = useState<TableRow[]>([]);
     const [selectedRow, setSelectedRow] = useState<TableRow | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -61,14 +63,15 @@ const getHeaderColor = (level: string | undefined) => {
     const headerFillColor = getHeaderFillColor(userLevel);
 
     const yearLabel = activatedTahun;
+    const monthKey = getMonthKey(activatedBulan);
     const monthLabel = getMonthName(activatedBulan);
 
     const apiUrl = useMemo(() => {
-        if (!user?.nip || !yearLabel || !monthLabel) return null;
+        if (!user?.nip || !yearLabel || !monthKey) return null;
         return `/api/v1/realisasi/rekin/by-nip/${encodeURIComponent(
             user.nip,
-        )}/by-tahun/${encodeURIComponent(yearLabel)}/by-bulan/${encodeURIComponent(monthLabel)}`;
-    }, [user?.nip, yearLabel, monthLabel]);
+        )}/by-tahun/${encodeURIComponent(yearLabel)}/by-bulan/${encodeURIComponent(monthKey)}`;
+    }, [user?.nip, yearLabel, monthKey]);
 
     const { data, loading, error } = useFetchData<RekinIndividuResponse[]>({
         url: apiUrl,
@@ -193,8 +196,8 @@ const getHeaderColor = (level: string | undefined) => {
                     target?.target || "-",
                     target?.realisasi ?? "-",
                     target?.satuan || "-",
-                    target?.capaian || "-",
-                    target?.keteranganCapaian || "-",
+                    formatPercentageText(target?.capaian || "-"),
+                    formatPercentageText(target?.keteranganCapaian || "-"),
                 ];
 
                 if (targetIndex === 0) {
@@ -272,10 +275,10 @@ const getHeaderColor = (level: string | undefined) => {
         previewDoc.save(pdfFileName);
     };
 
-    const infoMessage = !user?.nip
+    const infoMessage = !user || (!user?.nip && !canBypassNip)
         ? "Silakan login terlebih dahulu untuk melihat data rekin individu."
         : !yearLabel || !monthLabel
-            ? "Harap pilih tahun dan bulan dahulu"
+            ? "Pilih dan aktifkan tahun dan bulan agar data rekin individu muncul."
             : undefined;
 
     if (infoMessage) {
@@ -307,8 +310,8 @@ const getHeaderColor = (level: string | undefined) => {
 
     if (!rows.length) {
         return (
-            <div className="rounded border border-emerald-200 px-4 py-6 text-center text-sm text-gray-600">
-                Data rekin individu untuk tahun {yearLabel} belum tersedia.
+            <div className="rounded border border-red-200 px-4 py-6 text-center text-sm text-gray-600">
+                Data rekin individu tidak ada.
             </div>
         );
     }
@@ -410,10 +413,10 @@ const getHeaderColor = (level: string | undefined) => {
                                         {target?.satuan || "-"}
                                     </td>
                                     <td className="border-r border-b border-emerald-500 px-6 py-4">
-                                        {target?.capaian || "-"}
+                                        {formatPercentageText(target?.capaian || "-")}
                                     </td>
                                     <td className="border-r border-b border-emerald-500 px-6 py-4">
-                                        {target?.keteranganCapaian || "-"}
+                                        {formatPercentageText(target?.keteranganCapaian || "-")}
                                     </td>
                                     <td className="border-r border-b border-emerald-500 px-6 py-4">
                                         <div className="flex flex-col items-center gap-2">

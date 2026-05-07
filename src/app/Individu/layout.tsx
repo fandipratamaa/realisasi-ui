@@ -4,9 +4,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React from 'react'
 import { RouteGuard } from '@/components/Global/RouteGuard'
+import { useUserContext } from '@/context/UserContext'
+import { canAccessIndividuRenja } from '@/lib/rbac'
 
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const { user } = useUserContext()
   const pathname = usePathname()
   const relativePath = pathname.replace(/^\/realisasi/, '')
   const navItems = [
@@ -28,7 +31,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       activeClass: 'bg-green-600 text-white border-green-600',
       inactiveClass: 'text-[#1C1D1D] hover:bg-green-700 hover:text-white',
     },
-  ]
+  ].filter((item) => {
+    if (item.href !== '/Individu/Renja') return true
+    return canAccessIndividuRenja(user)
+  })
 
   return (
     <RouteGuard>

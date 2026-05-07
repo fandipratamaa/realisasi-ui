@@ -2,80 +2,125 @@
 
 import { LoadingBeat } from "@/components/Global/Loading";
 import { FormModal } from "@/components/Global/Modal";
-import { useFetchData } from "@/hooks/useFetchData";
 import { useFilterContext } from "@/context/FilterContext";
-import { getMonthName } from "@/lib/months";
+import { useUserContext } from "@/context/UserContext";
+import { useFetchData } from "@/hooks/useFetchData";
+import { getMonthKey, getMonthName } from "@/lib/months";
+import { canEditOpdRealisasi } from "@/lib/rbac";
+import { formatPercentageText } from "@/lib/formatPercentageText";
 import {
-  TujuanOpdPerencanaan,
-  TujuanOpdPerencanaanResponse,
+  TujuanOpdRealisasiGrouped,
   TujuanOpdRealisasiResponse,
   TujuanOpdTargetRealisasiCapaian,
 } from "@/types";
-import React, { useEffect, useState } from "react";
+import autoTable from "jspdf-autotable";
+import jsPDF from "jspdf";
+import React, { useEffect, useMemo, useState } from "react";
 import FormRealisasiTujuanOpd from "./_components/FormRealisasiTujuanOpd";
 import TableTujuanOpd from "./_components/TableTujuanOpd";
-import { gabunganDataPerencanaanRealisasi } from "./_lib/gabunganDataPerencanaanRealisasi";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+
+const sanitizeForPdf = (value: unknown) => {
+  if (value == null) return "-";
+  let text = String(value);
+
+  try {
+    text = text.normalize("NFKC");
+  } catch {
+    // ignore
+  }
+
+  text = text.replace(/\u2265/g, ">=").replace(/\u2264/g, "<=").replace(/\u00b1/g, "+/-");
+  text = text.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F]/g, "");
+  text = text.replace(/\s+/g, " ").trim();
+
+  return text.length ? text : "-";
+};
 
 export default function TujuanPage() {
-  const { activatedDinas: kodeOpd, activatedTahun: selectedTahun, activatedBulan, bulan } = useFilterContext();
-  const selectedTahunValue = selectedTahun ? parseInt(selectedTahun) : 2025;
-  const bulanName = getMonthName(activatedBulan) ?? getMonthName(bulan ?? null) ?? "Bulan";
-  const periode = [2025, 2026, 2027, 2028, 2029, 2030];
-  const tahunAwal = periode[0];
-  const tahunAkhir = periode[periode.length - 1];
-  const jenisPeriode = "rpjmd";
+  const { user } = useUserContext();
   const {
-    data: tujuanOpdData,
-    loading: perencanaanLoading,
-    error: perencanaanError,
-  } = useFetchData<TujuanOpdPerencanaanResponse>({
-    url: kodeOpd ? `/api/perencanaan/tujuan_opd/findall/${kodeOpd}/tahunawal/${tahunAwal}/tahunakhir/${tahunAkhir}/jenisperiode/${jenisPeriode}` : null,
-  });
-const {
-    data: realizationData,
-    loading: realizationLoading,
-    error: realizationError,
-    refetch: refetchRealization,
+    activatedDinas: kodeOpd,
+    activatedTahun: selectedTahun,
+    activatedBulan,
+    bulan,
+    namaDinas,
+  } = useFilterContext();
+
+  const selectedTahunValue = selectedTahun ? parseInt(selectedTahun, 10) : 2025;
+  const bulanKey = getMonthKey(activatedBulan) ?? getMonthKey(bulan ?? null);
+  const bulanName = getMonthName(activatedBulan) ?? getMonthName(bulan ?? null) ?? "Bulan";
+
+  const {
+    data: realisasiData,
+    loading: realisasiLoading,
+    error: realisasiError,
+    refetch: refetchRealisasi,
   } = useFetchData<TujuanOpdRealisasiResponse>({
-    url: kodeOpd && selectedTahunValue && bulanName ? `/api/v1/realisasi/tujuan_opd/${kodeOpd}/tahun/${selectedTahunValue}/bulan/${encodeURIComponent(bulanName)}` : null,
+    url:
+      kodeOpd && selectedTahunValue && bulanKey
+        ? `/api/v1/realisasi/tujuan_opd/${kodeOpd}/tahun/${selectedTahunValue}/bulan/${encodeURIComponent(bulanKey ?? "")}`
+        : null,
   });
-  const [TargetRealisasiCapaian, setTargetRealisasiCapaian] = useState<
-    TujuanOpdTargetRealisasiCapaian[]
-  >([]);
-  const [PerencanaanTujuanOpd, setPerencanaanTujuanOpd] = useState<
-    TujuanOpdPerencanaan[]
-  >([]);
-  const [NamaOpd, setNamaOpd] = useState<string>("");
-  const [OpenModal, setOpenModal] = useState<boolean>(false);
-  const [TujuanOpdSelected, setTujuanOpdSelected] = useState<
-    TujuanOpdTargetRealisasiCapaian[]
-  >([]);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [tujuanOpdSelected, setTujuanOpdSelected] = useState<TujuanOpdTargetRealisasiCapaian[]>([]);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfFileName, setPdfFileName] = useState("tujuan-opd.pdf");
   const [previewDoc, setPreviewDoc] = useState<jsPDF | null>(null);
+  const canEdit = canEditOpdRealisasi(user);
 
-  useEffect(() => {
-    if (tujuanOpdData?.data && realizationData && kodeOpd) {
-      const perencanaan = tujuanOpdData.data;
-      setPerencanaanTujuanOpd(perencanaan[0].tujuan_opd);
+  const groupedTujuanOpd = useMemo<TujuanOpdRealisasiGrouped[]>(() => {
+    const source = realisasiData ?? [];
+    const tujuanMap = new Map<string, TujuanOpdRealisasiGrouped>();
 
-      setNamaOpd(perencanaan[0].nama_opd);
+    source.forEach((item) => {
+      const tujuanKey = String(item.tujuanId);
+      const indikatorKey = String(item.indikatorId);
 
-      const combinedData = gabunganDataPerencanaanRealisasi(
-        perencanaan[0].tujuan_opd,
-        realizationData,
-        kodeOpd,
-      );
-      setTargetRealisasiCapaian(combinedData);
-    } else {
-      setNamaOpd("");
-      setTargetRealisasiCapaian([]);
-      setPerencanaanTujuanOpd([]);
-    }
-  }, [tujuanOpdData, realizationData, kodeOpd]);
+      let tujuan = tujuanMap.get(tujuanKey);
+      if (!tujuan) {
+        tujuan = {
+          tujuanId: tujuanKey,
+          tujuanOpd: item.tujuan ?? "-",
+          indikator: [],
+        };
+        tujuanMap.set(tujuanKey, tujuan);
+      }
+
+      let indikator = tujuan.indikator.find((row) => row.id === indikatorKey);
+      if (!indikator) {
+        indikator = {
+          id: indikatorKey,
+          indikator: item.indikator ?? "-",
+          rumusPerhitungan: item.rumusPerhitungan ?? "-",
+          sumberData: item.sumberData ?? "-",
+          targets: [],
+        };
+        tujuan.indikator.push(indikator);
+      }
+
+      indikator.targets.push({
+        targetRealisasiId: item.id ?? null,
+        tujuanOpd: item.tujuan ?? "-",
+        tujuanId: String(item.tujuanId),
+        indikatorId: String(item.indikatorId),
+        indikator: item.indikator ?? "-",
+        targetId: String(item.targetId),
+        target: item.target ?? "-",
+        realisasi: item.realisasi ?? 0,
+        capaian: item.capaian ?? "-",
+        keteranganCapaian: item.keteranganCapaian ?? "-",
+        satuan: item.satuan ?? "-",
+        tahun: String(item.tahun ?? ""),
+        kodeOpd: item.kodeOpd ?? kodeOpd ?? "",
+        rumusPerhitungan: item.rumusPerhitungan ?? "-",
+        sumberData: item.sumberData ?? "-",
+      });
+    });
+
+    return Array.from(tujuanMap.values());
+  }, [realisasiData, kodeOpd]);
 
   useEffect(() => {
     return () => {
@@ -85,53 +130,51 @@ const {
     };
   }, [pdfPreviewUrl]);
 
-  if (perencanaanLoading || realizationLoading)
-    return <LoadingBeat loading={perencanaanLoading} />;
-  if (perencanaanError)
-    return <div>Error fetching perencanaan: {perencanaanError}</div>;
-  if (realizationError)
-    return <div>Error fetching realistasi: {realizationError}</div>;
-
-  if (!kodeOpd || !selectedTahun || !bulanName) {
+  if (!kodeOpd) {
     return (
       <div className="p-5 bg-red-100 border-red-400 rounded text-red-700 my-5">
-        Harap pilih OPD, tahun, dan bulan dahulu
+        Silakan pilih OPD terlebih dahulu untuk melihat data tujuan OPD.
       </div>
     );
   }
 
-  const handleOpenModal = (
-    tujuan: TujuanOpdPerencanaan,
-    dataTargetRealisasi: TujuanOpdTargetRealisasiCapaian[],
-  ) => {
+  if (!selectedTahun || !bulanKey) {
+    return (
+      <div className="p-5 bg-red-100 border-red-400 rounded text-red-700 my-5">
+        Pilih dan aktifkan tahun dan bulan agar data tujuan OPD muncul.
+      </div>
+    );
+  }
+
+  if (realisasiLoading) {
+    return (
+      <div className="rounded border border-red-200 px-4 py-6 text-center">
+        <LoadingBeat loading={true} />
+        <p className="text-sm text-gray-600 mt-2">Memuat data tujuan OPD...</p>
+      </div>
+    );
+  }
+
+  if (realisasiError) {
+    return (
+      <div className="rounded border border-red-300 px-4 py-6 text-center text-sm text-red-700">
+        Error fetching realisasi: {realisasiError}
+      </div>
+    );
+  }
+
+  if (!groupedTujuanOpd.length) {
+    return (
+      <div className="rounded border border-red-200 px-4 py-6 text-center text-sm text-gray-600">
+        Data tujuan OPD tidak ada.
+      </div>
+    );
+  }
+
+  const handleOpenModal = (dataTargetRealisasi: TujuanOpdTargetRealisasiCapaian[]) => {
+    if (!canEdit) return;
     setTujuanOpdSelected(dataTargetRealisasi);
-    setOpenModal(true);
-  };
-
-  const sanitizeForPdf = (value: unknown) => {
-    if (value == null) return "-";
-    let text = String(value);
-
-    // Normalize to reduce odd Unicode representations.
-    try {
-      text = text.normalize("NFKC");
-    } catch {
-      // ignore if environment doesn't support normalize
-    }
-
-    // Replace common math symbols that often break jsPDF's built-in fonts.
-    text = text
-      .replace(/\u2265/g, ">=") // ≥
-      .replace(/\u2264/g, "<=") // ≤
-      .replace(/\u00b1/g, "+/-"); // ±
-
-    // Remove zero-width / bidi controls that can cause spacing artifacts.
-    text = text.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F]/g, "");
-
-    // Collapse whitespace.
-    text = text.replace(/\s+/g, " ").trim();
-
-    return text.length ? text : "-";
+    setIsModalOpen(true);
   };
 
   const createPdfDocument = () => {
@@ -142,7 +185,7 @@ const {
     });
 
     const periodLabel = `${selectedTahunValue} - ${bulanName}`;
-    const opdTitle = NamaOpd ? ` - ${NamaOpd}` : "";
+    const opdTitle = namaDinas ? ` - ${namaDinas}` : "";
 
     doc.setFontSize(14);
     doc.text(`Tujuan OPD${opdTitle}`, 40, 40);
@@ -164,23 +207,19 @@ const {
 
     const tableBody: any[] = [];
 
-    PerencanaanTujuanOpd.forEach((tujuan, tujuanIndex) => {
-      const indikatorList = tujuan.indikator ?? [];
+    groupedTujuanOpd.forEach((tujuan, tujuanIndex) => {
       const detailRows: Array<Array<string | number>> = [];
 
-      if (indikatorList.length === 0) {
-        detailRows.push(["-", "-", "-", "-", "-", "-", "-"]);
+      if (!tujuan.indikator.length) {
+        detailRows.push(["-", "-", "-", "-", "-", "-", "-", "-"]);
       } else {
-        indikatorList.forEach((indikator) => {
-          const targetsInYear = (indikator.target ?? []).filter(
-            (target) => target.tahun === String(selectedTahunValue),
-          );
-
-          if (targetsInYear.length === 0) {
+        tujuan.indikator.forEach((indikator) => {
+          if (!indikator.targets.length) {
             detailRows.push([
               sanitizeForPdf(indikator.indikator),
-              sanitizeForPdf(indikator.rumus_perhitungan),
-              sanitizeForPdf(indikator.sumber_data),
+              sanitizeForPdf(indikator.rumusPerhitungan),
+              sanitizeForPdf(indikator.sumberData),
+              "-",
               "-",
               "-",
               "-",
@@ -189,23 +228,16 @@ const {
             return;
           }
 
-          targetsInYear.forEach((targetPlan) => {
-            const realisasi = TargetRealisasiCapaian.find(
-              (item) =>
-                item.indikatorId === String(indikator.id) &&
-                item.targetId === String(targetPlan.id) &&
-                item.tahun === String(selectedTahunValue),
-            );
-
+          indikator.targets.forEach((target) => {
             detailRows.push([
               sanitizeForPdf(indikator.indikator),
-              sanitizeForPdf(indikator.rumus_perhitungan),
-              sanitizeForPdf(indikator.sumber_data),
-              sanitizeForPdf(targetPlan.target),
-              realisasi?.realisasi ?? 0,
-              sanitizeForPdf(realisasi?.satuan || targetPlan.satuan),
-              sanitizeForPdf(realisasi?.capaian),
-              sanitizeForPdf(realisasi?.keteranganCapaian),
+              sanitizeForPdf(indikator.rumusPerhitungan),
+              sanitizeForPdf(indikator.sumberData),
+              sanitizeForPdf(target.target),
+              target.realisasi ?? 0,
+              sanitizeForPdf(target.satuan),
+              sanitizeForPdf(formatPercentageText(target.capaian)),
+              sanitizeForPdf(formatPercentageText(target.keteranganCapaian)),
             ]);
           });
         });
@@ -215,7 +247,7 @@ const {
         if (detailIndex === 0) {
           tableBody.push([
             { content: tujuanIndex + 1, rowSpan: detailRows.length },
-            { content: sanitizeForPdf(tujuan.tujuan), rowSpan: detailRows.length },
+            { content: sanitizeForPdf(tujuan.tujuanOpd), rowSpan: detailRows.length },
             ...detailRow,
           ]);
           return;
@@ -265,6 +297,7 @@ const {
     const safeMonthLabel = String(bulanName || "bulan").replace(/\s+/g, "-").toLowerCase();
     const safeYearLabel = String(selectedTahunValue || "tahun").replace(/\s+/g, "-").toLowerCase();
     const fileName = `tujuan-opd-${safeYearLabel}-${safeMonthLabel}.pdf`;
+
     return { doc, fileName };
   };
 
@@ -299,43 +332,39 @@ const {
 
   return (
     <div className="overflow-auto grid gap-2">
-      <h2 className="text-lg font-semibold mb-2">
-        Realisasi Tujuan OPD - {NamaOpd}
-      </h2>
+      <h2 className="text-lg font-semibold mb-2">Realisasi Tujuan OPD - {namaDinas ?? "-"}</h2>
       <TableTujuanOpd
         tahun={selectedTahunValue}
         bulanLabel={bulanName}
-        tujuanOpd={PerencanaanTujuanOpd}
-        targetRealisasiCapaians={TargetRealisasiCapaian}
+        tujuanOpd={groupedTujuanOpd}
+        canEdit={canEdit}
         handleOpenPrintPreview={handleOpenPrintPreview}
         handleOpenModal={handleOpenModal}
       />
       <FormModal
-        isOpen={OpenModal}
+        isOpen={isModalOpen}
         onClose={() => {
-          setOpenModal(false);
+          setIsModalOpen(false);
         }}
-        title={`Realisasi Tujuan OPD - ${TujuanOpdSelected[0]?.tujuanOpd || ""}`}
+        title={`Realisasi Tujuan OPD - ${tujuanOpdSelected[0]?.tujuanOpd || ""}`}
       >
         <FormRealisasiTujuanOpd
-          requestValues={TujuanOpdSelected}
+          requestValues={tujuanOpdSelected}
           tahun={selectedTahunValue}
+          bulan={bulanKey ?? ""}
           bulanLabel={bulanName}
           onClose={() => {
-            setOpenModal(false);
+            setIsModalOpen(false);
           }}
           onSuccess={() => {
-            setOpenModal(false);
-            refetchRealization();
+            setIsModalOpen(false);
+            refetchRealisasi();
           }}
         />
       </FormModal>
       {isPrintPreviewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/40"
-            onClick={handleClosePrintPreview}
-          ></div>
+          <div className="fixed inset-0 bg-black/40" onClick={handleClosePrintPreview}></div>
           <div className="relative z-10 w-[95vw] max-w-6xl rounded-lg bg-white p-4 shadow-lg">
             <div className="mb-3 border-b pb-2">
               <h2 className="text-lg font-semibold uppercase">Preview Cetak Tujuan OPD</h2>
@@ -344,11 +373,7 @@ const {
 
             <div className="h-[70vh] overflow-hidden rounded border border-gray-300">
               {pdfPreviewUrl ? (
-                <iframe
-                  title="Preview PDF Tujuan OPD"
-                  src={pdfPreviewUrl}
-                  className="h-full w-full"
-                />
+                <iframe title="Preview PDF Tujuan OPD" src={pdfPreviewUrl} className="h-full w-full" />
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-gray-500">
                   Gagal memuat preview PDF.
