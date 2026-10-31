@@ -28,49 +28,60 @@ export default function LaporanSasaranOpd() {
 
   return (
     <div className="p-4 bg-white rounded-lg shadow mt-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Laporan Realisasi Sasaran OPD</h2>
-        <Select
-          value={selectedLaporanOption}
-          options={laporanOptions}
-          placeholder="Laporan Realisasi"
-          isSearchable={false}
-          onChange={(opt) => {
-            setSelectedLaporanOption(opt)
-            if (opt) {
-              localStorage.setItem('selectedLaporanOpdSasaran', JSON.stringify(opt))
-            } else {
-              localStorage.removeItem('selectedLaporanOpdSasaran')
-            }
-          }}
-          formatOptionLabel={(option, { context }) =>
-            context === 'value' ? `Laporan Realisasi : ${option.label}` : option.label
-          }
-          styles={{
-            control: (base) => ({
-              ...base,
-              background: "linear-gradient(to right, #08C2FF, #006BFF)",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              minHeight: 38,
-              cursor: "pointer",
-              boxShadow: "none",
-            }),
-            singleValue: (base) => ({ ...base, color: "#fff" }),
-            placeholder: (base) => ({ ...base, color: "rgba(255,255,255,0.8)" }),
-            dropdownIndicator: (base) => ({ ...base, color: "#fff" }),
-            indicatorSeparator: () => ({ display: "none" }),
-            menu: (base) => ({ ...base, zIndex: 20, minWidth: 180 }),
-          }}
-        />
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
+        <div>
+          <h2 className="text-xl font-bold">Laporan Realisasi Sasaran OPD</h2>
+          {selectedLaporanOption ? (
+            <p className="mt-1 text-sm text-slate-500">
+              Laporan {selectedLaporanOption.label}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-[220px]">
+            <Select
+              value={selectedLaporanOption}
+              options={laporanOptions}
+              placeholder="Laporan Realisasi"
+              isSearchable={false}
+              onChange={(opt) => {
+                setSelectedLaporanOption(opt)
+                if (opt) {
+                  localStorage.setItem('selectedLaporanOpdSasaran', JSON.stringify(opt))
+                } else {
+                  localStorage.removeItem('selectedLaporanOpdSasaran')
+                }
+              }}
+              formatOptionLabel={(option, { context }) =>
+                context === 'value' ? `Laporan Realisasi : ${option.label}` : option.label
+              }
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  background: "linear-gradient(to right, #08C2FF, #006BFF)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "8px",
+                  minHeight: 38,
+                  cursor: "pointer",
+                  boxShadow: "none",
+                }),
+                singleValue: (base) => ({ ...base, color: "#fff" }),
+                placeholder: (base) => ({ ...base, color: "rgba(255,255,255,0.8)" }),
+                dropdownIndicator: (base) => ({ ...base, color: "#fff" }),
+                indicatorSeparator: () => ({ display: "none" }),
+                menu: (base) => ({ ...base, zIndex: 20, minWidth: 180 }),
+              }}
+            />
+          </div>
+        </div>
       </div>
-      {!isLoaded ? null : selectedLaporanOption ? (
-        <TableLaporanSasaranOpd laporanType={selectedLaporanOption.value} />
-      ) : (
-        <div className="p-5 border border-dashed border-gray-300 rounded text-center text-gray-500 my-5">
+      {!isLoaded ? null : !selectedLaporanOption ? (
+        <div className="p-5 bg-red-100 border border-red-400 rounded text-red-700 my-5">
           Pilih laporan realisasi agar data laporan sasaran opd muncul.
         </div>
+      ) : (
+        <TableLaporanSasaranOpd laporanType={selectedLaporanOption?.value} />
       )}
     </div>
   )
